@@ -1,0 +1,31 @@
+# Godot 4 + C# .gitignore
+
+# Godot-specific ignores
+.godot/
+*.import
+
+# Mono/C# ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# .NET build artifacts
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Export
+export/
+*.pck
+*.zip

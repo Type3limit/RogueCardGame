@@ -1,0 +1,98 @@
+[
+  {
+    "id": "sentry_bot",
+    "name": "重装哨兵",
+    "maxHp": 48,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "isHackable": true,
+    "hackThreshold": 8,
+    "minHpScalePerPlayer": 12,
+    "intentPatterns": [
+      { "type": "attack", "value": 8, "scope": "singleFront", "weight": 2.0, "description": "攻击 8" },
+      { "type": "attack", "value": 5, "hitCount": 2, "scope": "singleFront", "weight": 1.0, "description": "攻击 5×2" },
+      { "type": "defend", "value": 8, "scope": "self", "weight": 1.0, "description": "防御 8" }
+    ]
+  },
+  {
+    "id": "assault_drone",
+    "name": "突击机器人",
+    "maxHp": 36,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "isHackable": true,
+    "hackThreshold": 6,
+    "minHpScalePerPlayer": 8,
+    "intentPatterns": [
+      { "type": "attack", "value": 5, "scope": "singleFront", "weight": 2.0, "description": "攻击 5" },
+      { "type": "attack", "value": 12, "scope": "singleFront", "weight": 1.0, "description": "重击 12" },
+      { "type": "attackDefend", "value": 6, "scope": "singleFront", "weight": 1.0, "description": "攻击 6 + 防御 3" }
+    ]
+  },
+  {
+    "id": "guard_hound",
+    "name": "护卫犬",
+    "maxHp": 24,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "isHackable": false,
+    "intentPatterns": [
+      { "type": "attack", "value": 4, "hitCount": 2, "scope": "singleFront", "weight": 2.0, "description": "撕咬 4×2" },
+      { "type": "attack", "value": 7, "scope": "singleFront", "weight": 1.5, "description": "冲锋 7" },
+      { "type": "buff", "value": 2, "scope": "self", "weight": 0.5, "description": "嚎叫 (力量+2)" }
+    ]
+  },
+  {
+    "id": "heal_drone",
+    "name": "治愈无人机",
+    "maxHp": 20,
+    "preferredRow": "back",
+    "isElite": false,
+    "isBoss": false,
+    "isHackable": true,
+    "hackThreshold": 5,
+    "minHpScalePerPlayer": 5,
+    "intentPatterns": [
+      { "type": "heal", "value": 8, "scope": "allEnemies", "weight": 2.0, "description": "治疗 8" },
+      { "type": "defend", "value": 6, "scope": "self", "weight": 1.0, "description": "防御 6" },
+      { "type": "buff", "value": 1, "scope": "allEnemies", "weight": 1.0, "description": "强化 (力量+1)" }
+    ]
+  },
+  {
+    "id": "sniper_turret",
+    "name": "狙击炮台",
+    "maxHp": 28,
+    "preferredRow": "back",
+    "isElite": false,
+    "isBoss": false,
+    "isHackable": true,
+    "hackThreshold": 10,
+    "minHpScalePerPlayer": 7,
+    "intentPatterns": [
+      { "type": "attack", "value": 10, "scope": "singleBack", "weight": 2.0, "description": "🎯 狙击 10 (后排)" },
+      { "type": "attack", "value": 6, "scope": "singleAny", "weight": 1.5, "description": "射击 6" },
+      { "type": "defend", "value": 5, "scope": "self", "weight": 0.5, "description": "装甲 5" }
+    ]
+  },
+  {
+    "id": "cyber_guardian",
+    "name": "赛博守卫",
+    "maxHp": 80,
+    "preferredRow": "front",
+    "isElite": true,
+    "isBoss": false,
+    "isHackable": true,
+    "hackThreshold": 15,
+    "minHpScalePerPlayer": 20,
+    "intentPatterns": [
+      { "type": "attack", "value": 12, "scope": "singleFront", "weight": 2.0, "description": "重拳 12" },
+      { "type": "attack", "value": 6, "hitCount": 3, "scope": "singleFront", "weight": 1.0, "description": "连击 6×3" },
+      { "type": "defend", "value": 15, "scope": "self", "weight": 1.5, "description": "强化装甲 15" },
+      { "type": "debuff", "value": 2, "scope": "singleFront", "weight": 1.0, "description": "破甲 (脆弱2)" },
+      { "type": "attack", "value": 20, "scope": "allFront", "weight": 0.5, "description": "冲击波 20 (前排)" }
+    ]
+  }
+]

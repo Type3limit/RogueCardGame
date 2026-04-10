@@ -1,0 +1,340 @@
+[
+  {
+    "id": "vanguard_strike",
+    "name": "斩击",
+    "nameEn": "Strike",
+    "class": "vanguard",
+    "rarity": "starter",
+    "type": "attack",
+    "cost": 1,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "造成 6 点伤害。",
+    "effects": [
+      { "type": "damage", "value": 6 }
+    ],
+    "upgrade": {
+      "description": "造成 9 点伤害。",
+      "effects": [
+        { "type": "damage", "value": 9 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_defend",
+    "name": "防御",
+    "nameEn": "Defend",
+    "class": "vanguard",
+    "rarity": "starter",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "self",
+    "description": "获得 5 点护甲。",
+    "effects": [
+      { "type": "block", "value": 5 }
+    ],
+    "upgrade": {
+      "description": "获得 8 点护甲。",
+      "effects": [
+        { "type": "block", "value": 8 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_power_strike",
+    "name": "重击",
+    "nameEn": "Power Strike",
+    "class": "vanguard",
+    "rarity": "starter",
+    "type": "attack",
+    "cost": 2,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "造成 12 点伤害。",
+    "effects": [
+      { "type": "damage", "value": 12 }
+    ],
+    "upgrade": {
+      "description": "造成 16 点伤害。",
+      "effects": [
+        { "type": "damage", "value": 16 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_charge",
+    "name": "超载蓄能",
+    "nameEn": "Overcharge",
+    "class": "vanguard",
+    "rarity": "starter",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "self",
+    "description": "获得 3 层超载。获得 3 点护甲。",
+    "effects": [
+      { "type": "status", "value": 3, "statusId": "Overcharge" },
+      { "type": "block", "value": 3 }
+    ],
+    "upgrade": {
+      "description": "获得 4 层超载。获得 5 点护甲。",
+      "effects": [
+        { "type": "status", "value": 4, "statusId": "Overcharge" },
+        { "type": "block", "value": 5 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_overload_release",
+    "name": "超载释放",
+    "nameEn": "Overload Release",
+    "class": "vanguard",
+    "rarity": "starter",
+    "type": "attack",
+    "cost": 1,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "消耗所有超载层数，每层造成 3 点伤害。",
+    "effects": [
+      { "type": "damage", "value": 3 }
+    ],
+    "keywords": ["overloadConsume"],
+    "upgrade": {
+      "description": "消耗所有超载层数，每层造成 4 点伤害。",
+      "effects": [
+        { "type": "damage", "value": 4 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_shield_bash",
+    "name": "盾击",
+    "nameEn": "Shield Bash",
+    "class": "vanguard",
+    "rarity": "common",
+    "type": "attack",
+    "cost": 1,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "造成 6 点伤害。获得 4 点护甲。",
+    "effects": [
+      { "type": "damage", "value": 6 },
+      { "type": "block", "value": 4 }
+    ],
+    "upgrade": {
+      "description": "造成 8 点伤害。获得 6 点护甲。",
+      "effects": [
+        { "type": "damage", "value": 8 },
+        { "type": "block", "value": 6 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_taunt",
+    "name": "嘲讽",
+    "nameEn": "Taunt",
+    "class": "vanguard",
+    "rarity": "common",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "self",
+    "description": "获得 7 点护甲。获得 1 回合嘲讽。",
+    "effects": [
+      { "type": "block", "value": 7 },
+      { "type": "status", "value": 1, "statusId": "Taunt", "secondaryValue": 1 }
+    ],
+    "upgrade": {
+      "description": "获得 10 点护甲。获得 2 回合嘲讽。",
+      "effects": [
+        { "type": "block", "value": 10 },
+        { "type": "status", "value": 1, "statusId": "Taunt", "secondaryValue": 2 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_plasma_slash",
+    "name": "等离子斩",
+    "nameEn": "Plasma Slash",
+    "class": "vanguard",
+    "rarity": "common",
+    "type": "attack",
+    "cost": 2,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "造成 8 点伤害。施加 2 层易伤。",
+    "effects": [
+      { "type": "damage", "value": 8 },
+      { "type": "status", "value": 2, "statusId": "Vulnerable" }
+    ],
+    "upgrade": {
+      "description": "造成 11 点伤害。施加 3 层易伤。",
+      "effects": [
+        { "type": "damage", "value": 11 },
+        { "type": "status", "value": 3, "statusId": "Vulnerable" }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_fortify",
+    "name": "坚守阵线",
+    "nameEn": "Fortify",
+    "class": "vanguard",
+    "rarity": "common",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "self",
+    "description": "获得 8 点护甲。如果在前排，额外获得 4 点。",
+    "effects": [
+      { "type": "block", "value": 8 }
+    ],
+    "keywords": ["frontRowBonus"],
+    "upgrade": {
+      "description": "获得 11 点护甲。如果在前排，额外获得 6 点。",
+      "effects": [
+        { "type": "block", "value": 11 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_whirlwind",
+    "name": "旋风斩",
+    "nameEn": "Whirlwind",
+    "class": "vanguard",
+    "rarity": "uncommon",
+    "type": "attack",
+    "cost": 2,
+    "range": "melee",
+    "targetType": "allEnemies",
+    "description": "对所有敌人造成 7 点伤害。",
+    "effects": [
+      { "type": "damage", "value": 7 }
+    ],
+    "upgrade": {
+      "description": "对所有敌人造成 10 点伤害。",
+      "effects": [
+        { "type": "damage", "value": 10 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_second_wind",
+    "name": "二次呼吸",
+    "nameEn": "Second Wind",
+    "class": "vanguard",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "self",
+    "description": "回复 6 点生命值。获得 2 层超载。",
+    "effects": [
+      { "type": "heal", "value": 6 },
+      { "type": "status", "value": 2, "statusId": "Overcharge" }
+    ],
+    "upgrade": {
+      "description": "回复 9 点生命值。获得 3 层超载。",
+      "effects": [
+        { "type": "heal", "value": 9 },
+        { "type": "status", "value": 3, "statusId": "Overcharge" }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_battle_cry",
+    "name": "战吼",
+    "nameEn": "Battle Cry",
+    "class": "vanguard",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "self",
+    "description": "获得 2 层力量。抽 1 张牌。",
+    "effects": [
+      { "type": "status", "value": 2, "statusId": "Strength" },
+      { "type": "draw", "value": 1 }
+    ],
+    "upgrade": {
+      "description": "获得 3 层力量。抽 1 张牌。",
+      "effects": [
+        { "type": "status", "value": 3, "statusId": "Strength" },
+        { "type": "draw", "value": 1 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_tactical_mark",
+    "name": "战术标记",
+    "nameEn": "Tactical Mark",
+    "class": "vanguard",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 1,
+    "range": "ranged",
+    "targetType": "singleEnemy",
+    "isLink": true,
+    "description": "标记一个敌人，造成 4 点伤害和 1 层易伤。🔗队友攻击该目标额外造成 8 点伤害并施加 2 层易伤。",
+    "linkDescription": "队友攻击标记目标时额外造成 8 点伤害，施加 2 层易伤。",
+    "effects": [
+      { "type": "damage", "value": 4 },
+      { "type": "status", "value": 1, "statusId": "Vulnerable" }
+    ],
+    "upgrade": {
+      "description": "标记一个敌人，造成 6 点伤害和 2 层易伤。🔗队友攻击该目标额外造成 12 点伤害。",
+      "effects": [
+        { "type": "damage", "value": 6 },
+        { "type": "status", "value": 2, "statusId": "Vulnerable" }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_iron_bulwark",
+    "name": "铁壁守护",
+    "nameEn": "Iron Bulwark",
+    "class": "vanguard",
+    "rarity": "rare",
+    "type": "skill",
+    "cost": 2,
+    "range": "none",
+    "targetType": "self",
+    "isLink": true,
+    "description": "获得 12 点护甲。🔗后排队友打出攻击牌时，再获得 6 点护甲。",
+    "linkDescription": "后排队友打出攻击牌时，你额外获得 6 点护甲。",
+    "effects": [
+      { "type": "block", "value": 12 }
+    ],
+    "upgrade": {
+      "description": "获得 16 点护甲。🔗后排队友打出攻击牌时，再获得 8 点护甲。",
+      "effects": [
+        { "type": "block", "value": 16 }
+      ]
+    }
+  },
+  {
+    "id": "vanguard_overload_resonance",
+    "name": "超载共振",
+    "nameEn": "Overload Resonance",
+    "class": "vanguard",
+    "rarity": "rare",
+    "type": "attack",
+    "cost": 1,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "isLink": true,
+    "description": "消耗所有超载层数，每层造成 5 点伤害。🔗队友获得等同于造成伤害 20% 的护甲。",
+    "linkDescription": "队友获得等同于此卡造成伤害 20% 的护甲。",
+    "effects": [
+      { "type": "damage", "value": 5 }
+    ],
+    "keywords": ["overloadConsume"],
+    "upgrade": {
+      "description": "消耗所有超载层数，每层造成 7 点伤害。🔗队友获得造成伤害 30% 的护甲。",
+      "effects": [
+        { "type": "damage", "value": 7 }
+      ]
+    }
+  }
+]

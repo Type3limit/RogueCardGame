@@ -1,0 +1,105 @@
+[
+  {
+    "id": "quantum_core",
+    "name": "量子核心",
+    "nameEn": "Quantum Core",
+    "description": "战斗开始时获得 1 点能量。",
+    "rarity": "starter",
+    "trigger": "onCombatStart",
+    "effectType": "energy",
+    "value": 1,
+    "lore": "一枚微型量子处理器，散发着淡蓝色的光芒。"
+  },
+  {
+    "id": "nano_shield",
+    "name": "纳米护盾",
+    "nameEn": "Nano Shield",
+    "description": "每回合开始时获得 3 点护甲。",
+    "rarity": "common",
+    "trigger": "onTurnStart",
+    "effectType": "block",
+    "value": 3
+  },
+  {
+    "id": "data_crystal",
+    "name": "数据水晶",
+    "nameEn": "Data Crystal",
+    "description": "每击杀一个敌人获得 10 金币。",
+    "rarity": "common",
+    "trigger": "onEnemyKilled",
+    "effectType": "gold",
+    "value": 10
+  },
+  {
+    "id": "combat_stimulant",
+    "name": "战斗兴奋剂",
+    "nameEn": "Combat Stimulant",
+    "description": "战斗开始时获得 2 层力量。",
+    "rarity": "uncommon",
+    "trigger": "onCombatStart",
+    "effectType": "strength",
+    "value": 2
+  },
+  {
+    "id": "synapse_booster",
+    "name": "突触增强器",
+    "nameEn": "Synapse Booster",
+    "description": "每回合多抽 1 张牌。",
+    "rarity": "uncommon",
+    "trigger": "passive",
+    "effectType": "drawPerTurn",
+    "value": 1
+  },
+  {
+    "id": "link_amplifier",
+    "name": "链接放大器",
+    "nameEn": "Link Amplifier",
+    "description": "🔗链接卡的增强效果提升 50%。",
+    "rarity": "uncommon",
+    "trigger": "onLinkActivated",
+    "effectType": "linkBoost",
+    "value": 50
+  },
+  {
+    "id": "hack_accelerator",
+    "name": "入侵加速器",
+    "nameEn": "Hack Accelerator",
+    "description": "每次入侵行动额外 +2 入侵进度。",
+    "rarity": "uncommon",
+    "trigger": "onHackComplete",
+    "effectType": "hackBonus",
+    "value": 2
+  },
+  {
+    "id": "plasma_reactor",
+    "name": "等离子反应堆",
+    "nameEn": "Plasma Reactor",
+    "description": "获得 1 点额外能量上限。",
+    "rarity": "rare",
+    "trigger": "passive",
+    "effectType": "energy",
+    "value": 1
+  },
+  {
+    "id": "phase_cloak",
+    "name": "相位斗篷",
+    "nameEn": "Phase Cloak",
+    "description": "换排时获得 5 点护甲。",
+    "rarity": "rare",
+    "trigger": "onFormationSwitch",
+    "effectType": "block",
+    "value": 5
+  },
+  {
+    "id": "vanguard_badge",
+    "name": "先锋徽章",
+    "nameEn": "Vanguard Badge",
+    "description": "超载层数上限 +5。超载释放伤害 +1/层。",
+    "rarity": "boss",
+    "trigger": "passive",
+    "effectType": "overchargeBonus",
+    "value": 1,
+    "isClassSpecific": true,
+    "classRestriction": "vanguard"
+  }
+]

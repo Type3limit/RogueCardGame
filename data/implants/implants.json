@@ -1,0 +1,124 @@
+[
+  {
+    "id": "neural_optimizer",
+    "name": "神经优化器",
+    "nameEn": "Neural Optimizer",
+    "description": "每回合多抽 1 张牌。",
+    "slot": "neural",
+    "rarity": "common",
+    "craftCost": 15,
+    "effects": [
+      { "type": "drawPerTurn", "value": 1 }
+    ]
+  },
+  {
+    "id": "neural_overclocker",
+    "name": "神经超频器",
+    "nameEn": "Neural Overclocker",
+    "description": "获得 1 点额外能量。手牌上限 -2。",
+    "slot": "neural",
+    "rarity": "uncommon",
+    "craftCost": 25,
+    "effects": [
+      { "type": "energy", "value": 1 },
+      { "type": "maxHandSize", "value": -2 }
+    ]
+  },
+  {
+    "id": "dermal_plating",
+    "name": "皮下装甲",
+    "nameEn": "Dermal Plating",
+    "description": "最大生命值 +15。每回合开始获得 2 点护甲。",
+    "slot": "somatic",
+    "rarity": "common",
+    "craftCost": 15,
+    "effects": [
+      { "type": "maxHp", "value": 15 },
+      { "type": "turnStartBlock", "value": 2 }
+    ]
+  },
+  {
+    "id": "adrenal_pump",
+    "name": "肾上腺泵",
+    "nameEn": "Adrenal Pump",
+    "description": "击杀敌人时获得 1 点能量。最大生命值 -10。",
+    "slot": "somatic",
+    "rarity": "uncommon",
+    "craftCost": 25,
+    "effects": [
+      { "type": "killEnergy", "value": 1 },
+      { "type": "maxHp", "value": -10 }
+    ]
+  },
+  {
+    "id": "vanguard_berserker_core",
+    "name": "狂战核心",
+    "nameEn": "Berserker Core",
+    "description": "[先锋] 超载改为：每层超载 +1 力量，但每回合失去 2 点生命。",
+    "slot": "core",
+    "rarity": "rare",
+    "craftCost": 40,
+    "classRestriction": "vanguard",
+    "effects": [
+      { "type": "overchargeToStrength", "value": 1 },
+      { "type": "turnSelfDamage", "value": 2 }
+    ],
+    "lore": "据说这是从一个失控的先锋战士遗体中取出的核心组件。"
+  },
+  {
+    "id": "vanguard_reflector_core",
+    "name": "反射核心",
+    "nameEn": "Reflector Core",
+    "description": "[先锋] 超载改为：每层超载反弹 1 点伤害给攻击者。",
+    "slot": "core",
+    "rarity": "rare",
+    "craftCost": 40,
+    "classRestriction": "vanguard",
+    "effects": [
+      { "type": "overchargeThorns", "value": 1 }
+    ],
+    "lore": "将超载能量转化为防御性的电磁场。"
+  },
+  {
+    "id": "psion_resonance_core",
+    "name": "共鸣放大核心",
+    "nameEn": "Resonance Amplifier Core",
+    "description": "[灵能者] 共鸣层数衰减减半。每 5 层共鸣额外抽 1 张牌。",
+    "slot": "core",
+    "rarity": "rare",
+    "craftCost": 40,
+    "classRestriction": "psion",
+    "effects": [
+      { "type": "resonanceDecayHalf", "value": 1 },
+      { "type": "resonanceDrawBonus", "value": 5 }
+    ]
+  },
+  {
+    "id": "netrunner_protocol_core",
+    "name": "协议扩展核心",
+    "nameEn": "Protocol Extension Core",
+    "description": "[黑客] 协议栈最大容量 +2。入侵速度 +50%。",
+    "slot": "core",
+    "rarity": "rare",
+    "craftCost": 40,
+    "classRestriction": "netrunner",
+    "effects": [
+      { "type": "protocolStackSize", "value": 2 },
+      { "type": "hackSpeedBonus", "value": 50 }
+    ]
+  },
+  {
+    "id": "symbiote_control_core",
+    "name": "共生控制核心",
+    "nameEn": "Symbiote Control Core",
+    "description": "[共生体] 侵蚀自伤减半。侵蚀阈值效果增强 25%。",
+    "slot": "core",
+    "rarity": "rare",
+    "craftCost": 40,
+    "classRestriction": "symbiote",
+    "effects": [
+      { "type": "erosionSelfDamageHalf", "value": 1 },
+      { "type": "erosionBonusDamage", "value": 25 }
+    ]
+  }
+]

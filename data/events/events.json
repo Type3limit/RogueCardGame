@@ -1,0 +1,135 @@
+[
+  {
+    "id": "abandoned_lab",
+    "title": "废弃实验室",
+    "description": "你发现了一个废弃的研究设施。实验台上散落着各种设备和药剂。",
+    "choices": [
+      {
+        "text": "搜索实验台 (获得随机药水，但可能受到辐射伤害)",
+        "outcomes": [
+          { "effect": "gainPotion", "probability": 0.7, "flavorText": "你找到了一瓶还能使用的药剂。" },
+          { "effect": "loseHp", "value": 8, "probability": 0.3, "flavorText": "辐射泄漏！你受到了伤害。" }
+        ]
+      },
+      {
+        "text": "检查数据终端 (获得 50 金币)",
+        "outcomes": [
+          { "effect": "gainGold", "value": 50, "flavorText": "你下载了一些有价值的数据。" }
+        ]
+      },
+      {
+        "text": "离开",
+        "outcomes": [
+          { "effect": "nothing", "flavorText": "你决定不冒险。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "mysterious_merchant",
+    "title": "神秘商人",
+    "description": "一个穿着破旧斗篷的人向你走来，手中拿着一个发光的容器。",
+    "choices": [
+      {
+        "text": "用 80 金币购买神秘容器",
+        "outcomes": [
+          { "effect": "gainRelic", "probability": 0.6, "flavorText": "容器中是一件珍贵的遗物！" },
+          { "effect": "gainPotion", "probability": 0.4, "flavorText": "只是一瓶普通药水...不过也不亏。" }
+        ],
+        "condition": "gold>=80"
+      },
+      {
+        "text": "用 20 零件交换情报",
+        "outcomes": [
+          { "effect": "gainGold", "value": 100, "flavorText": "商人给了你一份秘密通道的坐标，能卖不少钱。" }
+        ],
+        "condition": "parts>=20"
+      },
+      {
+        "text": "礼貌拒绝",
+        "outcomes": [
+          { "effect": "nothing", "flavorText": "商人耸了耸肩消失在阴影中。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "training_sim",
+    "title": "训练模拟器",
+    "description": "一台还在运行的战斗训练模拟器。你可以用它来提升自己。",
+    "choices": [
+      {
+        "text": "进行战斗训练 (升级一张牌，失去 10 HP)",
+        "outcomes": [
+          { "effect": "upgradeCard", "flavorText": "高强度训练让你掌握了更强的技巧。" },
+          { "effect": "loseHp", "value": 10 }
+        ]
+      },
+      {
+        "text": "进行体能训练 (获得 5 最大生命值)",
+        "outcomes": [
+          { "effect": "gainMaxHp", "value": 5, "flavorText": "你感觉身体更强壮了。" }
+        ]
+      },
+      {
+        "text": "跳过",
+        "outcomes": [
+          { "effect": "nothing" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cyber_shrine",
+    "title": "数据神殿",
+    "description": "一座散发蓝光的古老数据节点。接入它可能会改变你的卡组。",
+    "isOneTime": true,
+    "choices": [
+      {
+        "text": "接入节点 (移除一张牌)",
+        "outcomes": [
+          { "effect": "removeCard", "flavorText": "多余的数据被清除，你的系统更加精简了。" }
+        ]
+      },
+      {
+        "text": "下载数据 (获得 15 零件)",
+        "outcomes": [
+          { "effect": "gainParts", "value": 15, "flavorText": "节点中包含有价值的蓝图数据。" }
+        ]
+      },
+      {
+        "text": "不碰它",
+        "outcomes": [
+          { "effect": "nothing", "flavorText": "你不信任这个节点，选择绕道而行。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "wounded_soldier",
+    "title": "受伤的士兵",
+    "description": "路边躺着一个受重伤的士兵。他看到你后露出希望的眼神。",
+    "choices": [
+      {
+        "text": "治疗他 (失去 15 HP，获得遗物)",
+        "outcomes": [
+          { "effect": "loseHp", "value": 15 },
+          { "effect": "gainRelic", "flavorText": "作为感谢，他给了你一件随身携带的装备。" }
+        ]
+      },
+      {
+        "text": "给他一瓶药水 (失去一瓶药水，获得 30 金币)",
+        "outcomes": [
+          { "effect": "gainGold", "value": 30, "flavorText": "他给了你一些积蓄作为报答。" }
+        ],
+        "condition": "hasPotion"
+      },
+      {
+        "text": "路过",
+        "outcomes": [
+          { "effect": "nothing", "flavorText": "你装作没看见，继续前行。" }
+        ]
+      }
+    ]
+  }
+]

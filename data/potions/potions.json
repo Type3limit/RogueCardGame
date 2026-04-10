@@ -1,0 +1,63 @@
+[
+  {
+    "id": "repair_nano",
+    "name": "修复纳米液",
+    "nameEn": "Repair Nano",
+    "description": "回复 30% 最大生命值。",
+    "rarity": "common",
+    "useTime": "anytime",
+    "effectType": "healPercent",
+    "value": 30
+  },
+  {
+    "id": "energy_cell",
+    "name": "能量电池",
+    "nameEn": "Energy Cell",
+    "description": "本回合获得 2 点能量。",
+    "rarity": "common",
+    "useTime": "combat",
+    "effectType": "energy",
+    "value": 2
+  },
+  {
+    "id": "strength_serum",
+    "name": "力量血清",
+    "nameEn": "Strength Serum",
+    "description": "获得 2 层力量（本场战斗）。",
+    "rarity": "common",
+    "useTime": "combat",
+    "effectType": "status",
+    "value": 2,
+    "statusId": "Strength"
+  },
+  {
+    "id": "block_gel",
+    "name": "防护凝胶",
+    "nameEn": "Block Gel",
+    "description": "获得 12 点护甲。",
+    "rarity": "common",
+    "useTime": "combat",
+    "effectType": "block",
+    "value": 12
+  },
+  {
+    "id": "hack_virus",
+    "name": "入侵病毒",
+    "nameEn": "Hack Virus",
+    "description": "对目标敌人施加 5 层入侵进度。",
+    "rarity": "uncommon",
+    "useTime": "combat",
+    "effectType": "hack",
+    "value": 5
+  },
+  {
+    "id": "overclock_serum",
+    "name": "超频血清",
+    "nameEn": "Overclock Serum",
+    "description": "本回合多抽 3 张牌。",
+    "rarity": "rare",
+    "useTime": "combat",
+    "effectType": "draw",
+    "value": 3
+  }
+]

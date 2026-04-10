@@ -29,6 +29,7 @@ public enum CardRarity
 /// </summary>
 public enum CardClass
 {
+    Neutral,
     Colorless,
     Vanguard,
     Psion,

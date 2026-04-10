@@ -1,0 +1,52 @@
+[
+  {
+    "id": "quantum_entangler",
+    "name": "量子纠缠器",
+    "nameEn": "Quantum Entangler",
+    "description": "任一玩家获得护甲时，其他玩家获得 2 点护甲。",
+    "rarity": "rare",
+    "trigger": "onBlockGained",
+    "isTeamRelic": true,
+    "effects": [{ "type": "teamBlock", "value": 2 }]
+  },
+  {
+    "id": "shared_neural_net",
+    "name": "共享神经网",
+    "nameEn": "Shared Neural Net",
+    "description": "每次链接成功触发时，双方抽 1 张牌。",
+    "rarity": "rare",
+    "trigger": "onLinkTriggered",
+    "isTeamRelic": true,
+    "effects": [{ "type": "drawForBoth", "value": 1 }]
+  },
+  {
+    "id": "squad_beacon",
+    "name": "小队信标",
+    "nameEn": "Squad Beacon",
+    "description": "每场战斗开始时，所有队友获得 1 点能量（仅首回合）。",
+    "rarity": "uncommon",
+    "trigger": "onCombatStart",
+    "isTeamRelic": true,
+    "effects": [{ "type": "teamEnergy", "value": 1 }]
+  },
+  {
+    "id": "revive_protocol",
+    "name": "复苏协议",
+    "nameEn": "Revive Protocol",
+    "description": "队友濒死时间延长 2 回合。复活后恢复 25% HP 而非 1 HP。",
+    "rarity": "rare",
+    "trigger": "passive",
+    "isTeamRelic": true,
+    "effects": [{ "type": "downedTurnBonus", "value": 2 }, { "type": "reviveHpPercent", "value": 25 }]
+  },
+  {
+    "id": "formation_matrix",
+    "name": "阵型矩阵",
+    "nameEn": "Formation Matrix",
+    "description": "前排玩家获得额外 3 护甲/回合。后排玩家每回合多抽 1 张牌。",
+    "rarity": "rare",
+    "trigger": "onTurnStart",
+    "isTeamRelic": true,
+    "effects": [{ "type": "frontRowBlock", "value": 3 }, { "type": "backRowDraw", "value": 1 }]
+  }
+]

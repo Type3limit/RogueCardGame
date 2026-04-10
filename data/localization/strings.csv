@@ -1,0 +1,55 @@
+key,zh_cn,en,ja
+ui.title,赛博尖塔,Cyber Spire,サイバースパイア
+ui.start_game,开始游戏,Start Game,ゲーム開始
+ui.continue,继续,Continue,続ける
+ui.settings,设置,Settings,設定
+ui.quit,退出,Quit,終了
+ui.new_run,新探索,New Run,新規探索
+ui.multiplayer,多人游戏,Multiplayer,マルチプレイ
+ui.create_lobby,创建房间,Create Lobby,ルーム作成
+ui.join_lobby,加入房间,Join Lobby,ルーム参加
+ui.ready,准备,Ready,準備完了
+ui.not_ready,取消准备,Not Ready,準備取消
+ui.start,开始,Start,スタート
+ui.end_turn,结束回合,End Turn,ターン終了
+ui.switch_row,切换站位,Switch Row,列変更
+ui.confirm,确认,Confirm,確認
+ui.cancel,取消,Cancel,キャンセル
+ui.back,返回,Back,戻る
+class.vanguard,先锋,Vanguard,ヴァンガード
+class.psion,灵能者,Psion,サイオン
+class.netrunner,黑客,Netrunner,ネットランナー
+class.symbiote,共生体,Symbiote,シンビオート
+combat.turn,回合 {0},Turn {0},ターン {0}
+combat.energy,能量,Energy,エネルギー
+combat.hp,生命值,HP,HP
+combat.block,护甲,Block,ブロック
+combat.draw_pile,抽牌堆,Draw Pile,ドローパイル
+combat.discard_pile,弃牌堆,Discard Pile,捨て札
+combat.front_row,前排,Front Row,前列
+combat.back_row,后排,Back Row,後列
+combat.victory,胜利！,Victory!,勝利！
+combat.defeat,战败...,Defeat...,敗北...
+combat.downed,倒下,Downed,ダウン
+combat.revived,复活！,Revived!,復活！
+status.strength,力量,Strength,筋力
+status.weak,虚弱,Weak,弱体
+status.vulnerable,易伤,Vulnerable,脆弱
+status.poison,毒素,Poison,毒
+status.regeneration,再生,Regeneration,再生
+status.thorns,荆棘,Thorns,棘
+status.overcharge,超载,Overcharge,オーバーチャージ
+status.resonance,共鸣,Resonance,共鳴
+status.protocol_stack,协议栈,Protocol Stack,プロトコルスタック
+status.erosion,侵蚀,Erosion,侵食
+map.combat,战斗,Combat,戦闘
+map.elite,精英,Elite,エリート
+map.boss,Boss,Boss,ボス
+map.shop,商店,Shop,ショップ
+map.rest,休息,Rest,休息
+map.event,事件,Event,イベント
+map.treasure,宝箱,Treasure,宝箱
+map.mod_station,改造站,Mod Station,改造ステーション
+link.waiting,等待响应...,Waiting for response...,応答待ち...
+link.triggered,链接成功！,Link Triggered!,リンク成功！
+link.expired,链接失效,Link Expired,リンク失効

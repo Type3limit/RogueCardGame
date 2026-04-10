@@ -1,0 +1,43 @@
+{
+  "multiplayerScaling": {
+    "2players": {
+      "enemyHpMultiplier": 1.6,
+      "bossHpMultiplier": 1.8,
+      "enemyCountBonus": 0,
+      "goldPerPlayerMultiplier": 0.8
+    },
+    "3players": {
+      "enemyHpMultiplier": 2.2,
+      "bossHpMultiplier": 2.5,
+      "enemyCountBonus": 1,
+      "goldPerPlayerMultiplier": 0.7
+    },
+    "4players": {
+      "enemyHpMultiplier": 2.8,
+      "bossHpMultiplier": 3.2,
+      "enemyCountBonus": 2,
+      "goldPerPlayerMultiplier": 0.6
+    }
+  },
+  "globalBalance": {
+    "baseDrawPerTurn": 5,
+    "baseEnergyPerTurn": 3,
+    "maxHandSize": 10,
+    "maxPotionSlots": 3,
+    "blockDecayRate": 1.0,
+    "eliteGoldBonus": 25,
+    "bossGoldBonus": 50,
+    "restHealPercent": 30,
+    "mapNodesPerFloor": { "min": 3, "max": 5 },
+    "eventChance": 0.15,
+    "eliteChance": 0.12,
+    "shopChance": 0.10,
+    "restChance": 0.10
+  },
+  "synergyLinkBalance": {
+    "linkWindowTurns": 1,
+    "maxPendingLinks": 3,
+    "baseResponseBonusPercent": 50,
+    "noResponsePenaltyPercent": 0
+  }
+}

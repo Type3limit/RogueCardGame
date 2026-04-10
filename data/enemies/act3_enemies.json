@@ -1,0 +1,80 @@
+[
+  {
+    "id": "void_walker",
+    "name": "虚空行者",
+    "nameEn": "Void Walker",
+    "hp": 60,
+    "formation": "front",
+    "intents": [
+      { "type": "attack", "damage": 16, "target": "highestAggro", "weight": 35, "description": "虚空裂斩" },
+      { "type": "attack", "damage": 12, "target": "backRow", "weight": 20, "description": "次元穿越" },
+      { "type": "defend", "block": 15, "weight": 20, "description": "虚空护盾" },
+      { "type": "debuff", "debuffId": "Vulnerable", "value": 2, "target": "random", "weight": 25, "description": "次元裂隙" }
+    ]
+  },
+  {
+    "id": "quantum_sniper",
+    "name": "量子狙击手",
+    "nameEn": "Quantum Sniper",
+    "hp": 40,
+    "formation": "back",
+    "intents": [
+      { "type": "attack", "damage": 22, "target": "lowestHp", "weight": 40, "description": "量子射击（无视站位）" },
+      { "type": "defend", "block": 10, "weight": 25, "description": "量子护罩" },
+      { "type": "buff", "buffId": "Strength", "value": 3, "target": "self", "weight": 20, "description": "瞄准" },
+      { "type": "attack", "damage": 8, "target": "random", "weight": 15, "description": "压制射击" }
+    ]
+  },
+  {
+    "id": "gravity_golem",
+    "name": "重力巨像",
+    "nameEn": "Gravity Golem",
+    "hp": 100,
+    "formation": "front",
+    "intents": [
+      { "type": "attack", "damage": 14, "target": "highestAggro", "weight": 30, "description": "重力拳" },
+      { "type": "attackAll", "damage": 10, "target": "frontRow", "weight": 25, "description": "重力波" },
+      { "type": "defend", "block": 25, "weight": 20, "description": "质量护盾" },
+      { "type": "debuff", "debuffId": "Weak", "value": 2, "target": "frontRow", "weight": 15, "description": "重力场" },
+      { "type": "taunt", "weight": 10, "description": "引力牵引" }
+    ]
+  },
+  {
+    "id": "temporal_wraith",
+    "name": "时间幽灵",
+    "nameEn": "Temporal Wraith",
+    "hp": 50,
+    "formation": "back",
+    "intents": [
+      { "type": "debuff", "debuffId": "Weak", "value": 1, "target": "allPlayers", "weight": 25, "description": "时间减速" },
+      { "type": "attack", "damage": 12, "target": "random", "weight": 30, "description": "时间射线" },
+      { "type": "heal", "value": 10, "target": "allAllies", "weight": 20, "description": "时间回溯" },
+      { "type": "buff", "buffId": "Strength", "value": 2, "target": "allAllies", "weight": 25, "description": "时间加速" }
+    ]
+  },
+  {
+    "id": "singularity_core",
+    "name": "奇点核心",
+    "nameEn": "Singularity Core",
+    "hp": 70,
+    "formation": "back",
+    "intents": [
+      { "type": "attackAll", "damage": 12, "target": "all", "weight": 35, "description": "奇点脉冲" },
+      { "type": "summon", "summonId": "void_fragment", "count": 2, "weight": 20, "description": "虚空碎片", "cooldown": 3 },
+      { "type": "buff", "buffId": "Strength", "value": 2, "target": "self", "weight": 20, "description": "能量聚集" },
+      { "type": "defend", "block": 15, "weight": 25, "description": "事件视界" }
+    ]
+  },
+  {
+    "id": "void_fragment",
+    "name": "虚空碎片",
+    "nameEn": "Void Fragment",
+    "hp": 12,
+    "isSummon": true,
+    "formation": "front",
+    "intents": [
+      { "type": "attack", "damage": 6, "target": "random", "weight": 60, "description": "碎片撞击" },
+      { "type": "selfDestruct", "damage": 12, "target": "all", "weight": 40, "description": "自爆" }
+    ]
+  }
+]

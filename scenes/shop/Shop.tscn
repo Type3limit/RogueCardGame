@@ -1,0 +1,106 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/shop/ShopScene.cs" id="1"]
+[ext_resource type="Texture2D" path="res://resources/textures/backgrounds/shop_bg.svg" id="2"]
+
+[node name="ShopScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.04, 0.04, 0.07, 1)
+
+[node name="BackgroundImage" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource("2")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="TopBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 40.0
+offset_right = -40.0
+offset_bottom = 65.0
+theme_override_constants/separation = 30
+
+[node name="Title" type="Label" parent="TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "💰 黑市商店"
+horizontal_alignment = 1
+
+[node name="GoldLabel" type="Label" parent="TopBar"]
+layout_mode = 2
+text = "💰 99"
+horizontal_alignment = 2
+
+[node name="ShopScroll" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.08
+anchor_right = 1.0
+anchor_bottom = 0.85
+offset_left = 30.0
+offset_right = -30.0
+
+[node name="ShopContent" type="VBoxContainer" parent="ShopScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 25
+
+[node name="CardSection" type="VBoxContainer" parent="ShopScroll/ShopContent"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="ShopScroll/ShopContent/CardSection"]
+layout_mode = 2
+text = "◈ 卡牌"
+
+[node name="CardRow" type="HBoxContainer" parent="ShopScroll/ShopContent/CardSection"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="MiscSection" type="VBoxContainer" parent="ShopScroll/ShopContent"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="ShopScroll/ShopContent/MiscSection"]
+layout_mode = 2
+text = "◈ 药剂 & 植入体"
+
+[node name="MiscRow" type="HBoxContainer" parent="ShopScroll/ShopContent/MiscSection"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ServiceSection" type="VBoxContainer" parent="ShopScroll/ShopContent"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="ShopScroll/ShopContent/ServiceSection"]
+layout_mode = 2
+text = "◈ 服务"
+
+[node name="ServiceRow" type="HBoxContainer" parent="ShopScroll/ShopContent/ServiceSection"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LeaveBtn" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.3
+anchor_top = 0.88
+anchor_right = 0.7
+anchor_bottom = 0.96
+text = "◀ 离开商店"

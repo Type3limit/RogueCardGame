@@ -1,0 +1,196 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using RogueCardGame.Core.Events;
+
+namespace RogueCardGame;
+
+public partial class EventScene : Control
+{
+    private Label _title = null!;
+    private RichTextLabel _description = null!;
+    private VBoxContainer _choicesContainer = null!;
+    private RichTextLabel _resultLabel = null!;
+    private Button _continueBtn = null!;
+
+    private EventData? _currentEvent;
+    private EventSystem? _eventSystem;
+
+    public override void _Ready()
+    {
+        _title = GetNode<Label>("EventPanel/Content/Title");
+        _description = GetNode<RichTextLabel>("EventPanel/Content/Description");
+        _choicesContainer = GetNode<VBoxContainer>("EventPanel/Content/ChoicesContainer");
+        _resultLabel = GetNode<RichTextLabel>("EventPanel/Content/ResultLabel");
+        _continueBtn = GetNode<Button>("EventPanel/Content/ContinueBtn");
+
+        _continueBtn.Pressed += OnContinuePressed;
+
+        StyleUI();
+        AudioManager.Instance?.PlayBgm(AudioManager.BgmPaths.Event);
+        LoadEvent();
+    }
+
+    private void StyleUI()
+    {
+        _title.AddThemeFontSizeOverride("font_size", 32);
+        _title.AddThemeColorOverride("font_color", new Color(0.4f, 0.6f, 0.9f));
+
+        var panelStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.08f, 0.08f, 0.12f),
+            BorderColor = new Color(0.3f, 0.3f, 0.5f),
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 12, CornerRadiusBottomRight = 12,
+            CornerRadiusTopLeft = 12, CornerRadiusTopRight = 12,
+            ContentMarginLeft = 30, ContentMarginRight = 30,
+            ContentMarginTop = 20, ContentMarginBottom = 20
+        };
+        GetNode<PanelContainer>("EventPanel").AddThemeStyleboxOverride("panel", panelStyle);
+
+        var continueStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.15f, 0.3f, 0.5f),
+            CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
+            CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6
+        };
+        _continueBtn.AddThemeStyleboxOverride("normal", continueStyle);
+        _continueBtn.AddThemeColorOverride("font_color", new Color(0f, 0.95f, 0.95f));
+        _continueBtn.AddThemeFontSizeOverride("font_size", 20);
+    }
+
+    private void LoadEvent()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        _eventSystem = new EventSystem(run.Random);
+        var allEvents = run.EventDb.GetAll();
+        _currentEvent = _eventSystem.SelectEvent(allEvents, run.CurrentAct);
+
+        if (_currentEvent == null)
+        {
+            // No events available, go back to map
+            _title.Text = "没有发现任何事件";
+            _description.Text = "这里空无一人...";
+            _continueBtn.Visible = true;
+            return;
+        }
+
+        _title.Text = _currentEvent.Title;
+        _description.Text = _currentEvent.Description;
+        BuildChoices();
+    }
+
+    private void BuildChoices()
+    {
+        foreach (var child in _choicesContainer.GetChildren())
+            child.QueueFree();
+
+        if (_currentEvent == null) return;
+
+        for (int i = 0; i < _currentEvent.Choices.Count; i++)
+        {
+            var choice = _currentEvent.Choices[i];
+            int choiceIndex = i;
+
+            var btn = new Button();
+            btn.Text = choice.Text;
+            btn.CustomMinimumSize = new Vector2(0, 50);
+            btn.AddThemeFontSizeOverride("font_size", 18);
+
+            var style = new StyleBoxFlat
+            {
+                BgColor = new Color(0.12f, 0.15f, 0.2f),
+                BorderColor = new Color(0.3f, 0.4f, 0.6f),
+                BorderWidthBottom = 1, BorderWidthTop = 1,
+                BorderWidthLeft = 1, BorderWidthRight = 1,
+                CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
+                CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6,
+                ContentMarginLeft = 15, ContentMarginRight = 15,
+                ContentMarginTop = 8, ContentMarginBottom = 8
+            };
+            btn.AddThemeStyleboxOverride("normal", style);
+
+            var hoverStyle = (StyleBoxFlat)style.Duplicate();
+            hoverStyle.BgColor = new Color(0.18f, 0.22f, 0.3f);
+            hoverStyle.BorderColor = new Color(0f, 0.95f, 0.95f);
+            btn.AddThemeStyleboxOverride("hover", hoverStyle);
+
+            btn.Pressed += () => OnChoiceMade(choiceIndex);
+            _choicesContainer.AddChild(btn);
+        }
+    }
+
+    private void OnChoiceMade(int choiceIndex)
+    {
+        if (_currentEvent == null || _eventSystem == null) return;
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+
+        var outcomes = _eventSystem.ResolveChoice(_currentEvent, choiceIndex);
+        ApplyOutcomes(outcomes);
+
+        // Hide choices, show result
+        _choicesContainer.Visible = false;
+        _continueBtn.Visible = true;
+    }
+
+    private void ApplyOutcomes(List<EventChoiceOutcome> outcomes)
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        var resultText = "";
+
+        foreach (var outcome in outcomes)
+        {
+            switch (outcome.Effect)
+            {
+                case EventChoiceEffect.GainGold:
+                    run.AddGold(outcome.Value);
+                    resultText += $"[color=yellow]获得 {outcome.Value} 金币[/color]\n";
+                    break;
+                case EventChoiceEffect.LoseGold:
+                    run.TrySpendGold(outcome.Value);
+                    resultText += $"[color=red]失去 {outcome.Value} 金币[/color]\n";
+                    break;
+                case EventChoiceEffect.GainHp:
+                    run.Player.Heal(outcome.Value);
+                    resultText += $"[color=green]恢复 {outcome.Value} 生命值[/color]\n";
+                    break;
+                case EventChoiceEffect.LoseHp:
+                    run.Player.TakeDamage(outcome.Value);
+                    resultText += $"[color=red]失去 {outcome.Value} 生命值[/color]\n";
+                    break;
+                case EventChoiceEffect.GainMaxHp:
+                    run.Player.MaxHp += outcome.Value;
+                    run.Player.Heal(outcome.Value);
+                    resultText += $"[color=green]最大生命值 +{outcome.Value}[/color]\n";
+                    break;
+                case EventChoiceEffect.LoseMaxHp:
+                    run.Player.MaxHp = Math.Max(1, run.Player.MaxHp - outcome.Value);
+                    if (run.Player.CurrentHp > run.Player.MaxHp)
+                        run.Player.CurrentHp = run.Player.MaxHp;
+                    resultText += $"[color=red]最大生命值 -{outcome.Value}[/color]\n";
+                    break;
+                case EventChoiceEffect.Nothing:
+                    resultText += outcome.FlavorText ?? "什么都没有发生。\n";
+                    break;
+                default:
+                    resultText += outcome.FlavorText ?? $"{outcome.Effect}\n";
+                    break;
+            }
+        }
+
+        _resultLabel.Text = resultText;
+    }
+
+    private void OnContinuePressed()
+    {
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+        SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+    }
+}

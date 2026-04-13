@@ -1,0 +1,83 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/map/MapScene.cs" id="1"]
+[ext_resource type="Texture2D" path="res://resources/textures/backgrounds/map_bg.svg" id="2"]
+
+[node name="MapScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.04, 0.04, 0.08, 1)
+
+[node name="BackgroundImage" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource("2")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="MapScroll" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 50.0
+offset_top = 80.0
+offset_right = -50.0
+offset_bottom = -80.0
+
+[node name="MapContainer" type="Control" parent="MapScroll"]
+layout_mode = 2
+
+[node name="TopBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 70.0
+theme_override_constants/separation = 30
+
+[node name="ActLabel" type="Label" parent="TopBar"]
+layout_mode = 2
+text = "第一幕"
+
+[node name="FloorLabel" type="Label" parent="TopBar"]
+layout_mode = 2
+text = "层数: 0"
+
+[node name="GoldLabel" type="Label" parent="TopBar"]
+layout_mode = 2
+text = "金币: 99"
+
+[node name="HpLabel" type="Label" parent="TopBar"]
+layout_mode = 2
+text = "HP: 85/85"
+
+[node name="DeckBtn" type="Button" parent="TopBar"]
+layout_mode = 2
+text = "查看牌组"
+
+[node name="BottomBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -60.0
+theme_override_constants/separation = 20
+
+[node name="PotionSlots" type="HBoxContainer" parent="BottomBar"]
+layout_mode = 2
+
+[node name="ImplantInfo" type="Label" parent="BottomBar"]
+layout_mode = 2
+text = "植入体: 无"

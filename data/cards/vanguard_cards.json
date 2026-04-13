@@ -97,13 +97,13 @@
     "targetType": "singleEnemy",
     "description": "消耗所有超载层数，每层造成 3 点伤害。",
     "effects": [
-      { "type": "damage", "value": 3 }
+      { "type": "overchargeConsume", "value": 0, "secondaryValue": 3 }
     ],
     "keywords": ["overloadConsume"],
     "upgrade": {
       "description": "消耗所有超载层数，每层造成 4 点伤害。",
       "effects": [
-        { "type": "damage", "value": 4 }
+        { "type": "overchargeConsume", "value": 0, "secondaryValue": 4 }
       ]
     }
   },
@@ -327,13 +327,13 @@
     "description": "消耗所有超载层数，每层造成 5 点伤害。🔗队友获得等同于造成伤害 20% 的护甲。",
     "linkDescription": "队友获得等同于此卡造成伤害 20% 的护甲。",
     "effects": [
-      { "type": "damage", "value": 5 }
+      { "type": "overchargeConsume", "value": 0, "secondaryValue": 5 }
     ],
     "keywords": ["overloadConsume"],
     "upgrade": {
       "description": "消耗所有超载层数，每层造成 7 点伤害。🔗队友获得造成伤害 30% 的护甲。",
       "effects": [
-        { "type": "damage", "value": 7 }
+        { "type": "overchargeConsume", "value": 0, "secondaryValue": 7 }
       ]
     }
   }

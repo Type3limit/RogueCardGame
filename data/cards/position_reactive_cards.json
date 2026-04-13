@@ -1,0 +1,144 @@
+[
+  {
+    "id": "phase_charge",
+    "name": "相位突进",
+    "nameEn": "Phase Charge",
+    "class": "vanguard",
+    "rarity": "common",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】对目标造成 8 点伤害，然后退入后排。\n【后排】移入前排，获得 8 点护甲。",
+    "frontEffects": [
+      { "type": "damage", "value": 8 },
+      { "type": "selfreposition", "value": 1 }
+    ],
+    "backEffects": [
+      { "type": "selfreposition", "value": 0 },
+      { "type": "block", "value": 8 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "攻势突进",
+        "description": "【前排】对目标造成 12 点伤害，退入后排。\n【后排】移入前排，获得 8 点护甲。",
+        "effects": [
+          { "type": "damage", "value": 12 },
+          { "type": "selfreposition", "value": 1 }
+        ]
+      },
+      "branchB": {
+        "name": "铁壁突进",
+        "description": "【前排】对目标造成 8 点伤害，退入后排。\n【后排】移入前排，获得 12 点护甲。",
+        "effects": [
+          { "type": "selfreposition", "value": 0 },
+          { "type": "block", "value": 12 }
+        ]
+      }
+    }
+  },
+  {
+    "id": "psi_lance",
+    "name": "灵能长矛",
+    "nameEn": "Psi Lance",
+    "class": "psion",
+    "rarity": "common",
+    "type": "attack",
+    "cost": 2,
+    "range": "ranged",
+    "targetType": "singleEnemy",
+    "description": "【前排】造成 6 点伤害，施加 1 层易伤。\n【后排】造成 10 点伤害。",
+    "frontEffects": [
+      { "type": "damage", "value": 6 },
+      { "type": "status", "statusId": "Vulnerable", "value": 1 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 10 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "狙击版",
+        "description": "【前排】造成 6 点伤害，施加 2 层易伤。\n【后排】造成 14 点伤害。"
+      },
+      "branchB": {
+        "name": "压制版",
+        "description": "【前排】造成 9 点伤害。\n【后排】造成 10 点伤害，施加 1 层虚弱。"
+      }
+    }
+  },
+  {
+    "id": "ghost_probe",
+    "name": "幽影刺探",
+    "nameEn": "Ghost Probe",
+    "class": "netrunner",
+    "rarity": "common",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】造成 5 点伤害并施加 1 层虚弱。\n【后排】抽 2 张牌。",
+    "frontEffects": [
+      { "type": "damage", "value": 5 },
+      { "type": "status", "statusId": "Weak", "value": 1 }
+    ],
+    "backEffects": [
+      { "type": "draw", "value": 2 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "狙击版",
+        "description": "【前排】造成 5 点伤害，施加 1 层虚弱，再施加 1 层易伤。\n【后排】抽 2 张牌。"
+      },
+      "branchB": {
+        "name": "情报版",
+        "description": "【前排】造成 5 点伤害和 1 层虚弱。\n【后排】抽 3 张牌。"
+      }
+    }
+  },
+  {
+    "id": "bio_adapt",
+    "name": "生物适应",
+    "nameEn": "Bio Adapt",
+    "class": "symbiote",
+    "rarity": "common",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】造成 6 点伤害，恢复 3 点生命。\n【后排】造成 10 点伤害，抽 1 张牌。",
+    "frontEffects": [
+      { "type": "damage", "value": 6 },
+      { "type": "heal", "value": 3 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 10 },
+      { "type": "draw", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "前排强化",
+        "description": "【前排】造成 9 点伤害，恢复 5 点生命。\n【后排】造成 10 点伤害，抽 1 张牌。"
+      },
+      "branchB": {
+        "name": "后排强化",
+        "description": "【前排】造成 6 点伤害，恢复 3 点生命。\n【后排】造成 14 点伤害，抽 1 张牌。"
+      }
+    }
+  },
+  {
+    "id": "glitch",
+    "name": "故障程序",
+    "nameEn": "Glitch",
+    "class": "netrunner",
+    "rarity": "common",
+    "type": "curse",
+    "cost": 0,
+    "range": "none",
+    "targetType": "self",
+    "description": "【诅咒】打出时对自身造成 2 点伤害（此牌由技能产生，会混入你的牌组）。",
+    "keywords": ["curse"],
+    "effects": [
+      { "type": "damage", "value": 2 }
+    ]
+  }
+]

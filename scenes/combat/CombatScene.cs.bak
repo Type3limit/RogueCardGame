@@ -1,0 +1,704 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using RogueCardGame.Core.Cards;
+using RogueCardGame.Core.Characters;
+using RogueCardGame.Core.Combat;
+using RogueCardGame.Core.Deck;
+using RogueCardGame.Core.Map;
+
+namespace RogueCardGame;
+
+/// <summary>
+/// Combat scene - the core gameplay loop.
+/// Displays hand, enemies, formation, energy and processes card plays.
+/// </summary>
+public partial class CombatScene : Control
+{
+    // UI Nodes
+    private HBoxContainer _enemyArea = null!;
+    private HBoxContainer _handArea = null!;
+    private HBoxContainer _intentArea = null!;
+    private Button _endTurnBtn = null!;
+    private Button _switchRowBtn = null!;
+    private Label _rowLabel = null!;
+    private ProgressBar _hpBar = null!;
+    private Label _energyLabel = null!;
+    private Label _blockLabel = null!;
+    private Label _classResourceLabel = null!;
+    private Label _drawPileLabel = null!;
+    private Label _discardPileLabel = null!;
+    private Label _exhaustPileLabel = null!;
+    private Control _damageNumbers = null!;
+
+    // Combat state
+    private CombatManager? _combat;
+    private PlayerCharacter? _player;
+    private DeckManager? _deck;
+    private Card? _selectedCard;
+    private readonly List<EnemyPanel> _enemyPanels = [];
+
+    // Card → Button mapping
+    private readonly Dictionary<Card, Button> _cardButtons = new();
+
+    public override void _Ready()
+    {
+        _enemyArea = GetNode<HBoxContainer>("EnemyArea");
+        _handArea = GetNode<HBoxContainer>("HandArea");
+        _intentArea = GetNode<HBoxContainer>("IntentArea");
+        _endTurnBtn = GetNode<Button>("EndTurnBtn");
+        _switchRowBtn = GetNode<Button>("FormationArea/SwitchRowBtn");
+        _rowLabel = GetNode<Label>("FormationArea/RowLabel");
+        _hpBar = GetNode<ProgressBar>("PlayerInfo/HpBar");
+        _energyLabel = GetNode<Label>("PlayerInfo/EnergyLabel");
+        _blockLabel = GetNode<Label>("PlayerInfo/BlockLabel");
+        _classResourceLabel = GetNode<Label>("PlayerInfo/ClassResourceLabel");
+        _drawPileLabel = GetNode<Label>("DeckInfo/DrawPileLabel");
+        _discardPileLabel = GetNode<Label>("DeckInfo/DiscardPileLabel");
+        _exhaustPileLabel = GetNode<Label>("DeckInfo/ExhaustPileLabel");
+        _damageNumbers = GetNode<Control>("DamageNumbers");
+
+        _endTurnBtn.Pressed += OnEndTurnPressed;
+        _switchRowBtn.Pressed += OnSwitchRowPressed;
+
+        StyleUI();
+        StartCombat();
+    }
+
+    private void StyleUI()
+    {
+        var cyanColor = new Color(0f, 0.95f, 0.95f);
+        var endTurnStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.8f, 0.2f, 0.2f),
+            CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
+            CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6
+        };
+        _endTurnBtn.AddThemeStyleboxOverride("normal", endTurnStyle);
+        _endTurnBtn.AddThemeColorOverride("font_color", Colors.White);
+        _endTurnBtn.AddThemeFontSizeOverride("font_size", 20);
+
+        var switchStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.1f, 0.3f, 0.5f),
+            CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4,
+            CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4
+        };
+        _switchRowBtn.AddThemeStyleboxOverride("normal", switchStyle);
+        _switchRowBtn.AddThemeColorOverride("font_color", cyanColor);
+    }
+
+    private void StartCombat()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null)
+        {
+            GD.PrintErr("[CombatScene] No active run!");
+            return;
+        }
+
+        _player = run.Player;
+
+        // Get enemies for this node
+        var enemies = CreateEnemiesForNode(run);
+
+        // Create combat instance
+        _combat = run.CreateCombat(enemies);
+        if (_combat == null)
+        {
+            GD.PrintErr("[CombatScene] Failed to create combat instance");
+            SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+            return;
+        }
+
+        // Hook events
+        _combat.OnCardPlayed += OnCardPlayed;
+        _combat.OnDamageDealt += OnDamageDealt;
+        _combat.OnCombatEnded += OnCombatEnded;
+        _combat.OnEnemyAction += OnEnemyAction;
+
+        // Get the deck manager
+        if (_combat.PlayerDecks.TryGetValue(_player.Id, out var deck))
+            _deck = deck;
+
+        // Start
+        _combat.StartCombat();
+        // Play BGM based on encounter type
+        var currentNode = run.CurrentMap?.CurrentNode;
+        bool isBoss = currentNode?.Type == RoomType.Boss;
+        AudioManager.Instance?.PlayBgm(isBoss ? AudioManager.BgmPaths.Boss : AudioManager.BgmPaths.Combat);
+
+        // Build enemy UI
+        BuildEnemyPanels();
+        RefreshAll();
+    }
+
+    private List<Enemy> CreateEnemiesForNode(Core.Run.RunState run)
+    {
+        var node = run.CurrentMap?.CurrentNode;
+        if (node == null) return [new Enemy(CreateFallbackEnemyData())];
+
+        bool isElite = node.Type == RoomType.EliteCombat;
+        bool isBoss = node.Type == RoomType.Boss;
+
+        // Try to load enemies from the node's EncounterId
+        if (!string.IsNullOrEmpty(node.EncounterId))
+        {
+            // TODO: Load from EnemyDatabase when implemented
+        }
+
+        // For now, generate procedural enemies based on act/type
+        var enemies = new List<Enemy>();
+        int act = run.CurrentAct;
+
+        if (isBoss)
+        {
+            enemies.Add(new Enemy(CreateBossData(act)));
+        }
+        else if (isElite)
+        {
+            enemies.Add(new Enemy(CreateEliteData(act)));
+        }
+        else
+        {
+            int count = run.Random.Next(1, 4);
+            for (int i = 0; i < count; i++)
+                enemies.Add(new Enemy(CreateNormalEnemyData(act, run.Random)));
+        }
+
+        return enemies;
+    }
+
+    private static EnemyData CreateFallbackEnemyData() => new()
+    {
+        Id = "fallback",
+        Name = "测试敌人",
+        MaxHp = 30,
+        PreferredRow = FormationRow.Front,
+        IntentPatterns =
+        [
+            new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 8 },
+            new EnemyIntentPattern { Type = EnemyIntentType.Defend, Value = 5 },
+        ]
+    };
+
+    private static EnemyData CreateNormalEnemyData(int act, SeededRandom rng)
+    {
+        int baseHp = 20 + act * 10 + rng.Next(0, 10);
+        int baseDmg = 5 + act * 3;
+        string[] names = ["赛博暴徒", "流浪机器人", "病毒蠕虫", "净化无人机", "黑市走私者"];
+        return new()
+        {
+            Id = $"normal_{act}_{rng.Next(1000)}",
+            Name = names[rng.Next(names.Length)],
+            MaxHp = baseHp,
+            PreferredRow = rng.NextDouble() < 0.5 ? FormationRow.Front : FormationRow.Back,
+            IntentPatterns =
+            [
+                new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = baseDmg, Weight = 0.5f },
+                new EnemyIntentPattern { Type = EnemyIntentType.AttackDefend, Value = baseDmg - 2, Weight = 0.3f },
+                new EnemyIntentPattern { Type = EnemyIntentType.Defend, Value = baseDmg, Weight = 0.2f },
+            ]
+        };
+    }
+
+    private static EnemyData CreateEliteData(int act) => new()
+    {
+        Id = $"elite_{act}",
+        Name = act switch { 1 => "铬合金执法者", 2 => "赛博武士", _ => "暗网守护者" },
+        MaxHp = 60 + act * 25,
+        PreferredRow = FormationRow.Front,
+        IsElite = true,
+        IntentPatterns =
+        [
+            new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 10 + act * 5, Weight = 0.4f },
+            new EnemyIntentPattern { Type = EnemyIntentType.AttackDefend, Value = 8 + act * 3, Weight = 0.3f },
+            new EnemyIntentPattern { Type = EnemyIntentType.Buff, Value = 3, Weight = 0.15f },
+            new EnemyIntentPattern { Type = EnemyIntentType.Debuff, Value = 2, Weight = 0.15f },
+        ]
+    };
+
+    private static EnemyData CreateBossData(int act) => new()
+    {
+        Id = $"boss_{act}",
+        Name = act switch { 1 => "垃圾场领主", 2 => "公司执行官", _ => "AI核心" },
+        MaxHp = 120 + act * 50,
+        PreferredRow = FormationRow.Front,
+        IsBoss = true,
+        IntentPatterns =
+        [
+            new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 15 + act * 5, Weight = 0.35f },
+            new EnemyIntentPattern { Type = EnemyIntentType.AttackDefend, Value = 12 + act * 3, Weight = 0.25f },
+            new EnemyIntentPattern { Type = EnemyIntentType.Buff, Value = 4, Weight = 0.15f },
+            new EnemyIntentPattern { Type = EnemyIntentType.Debuff, Value = 3, Weight = 0.15f },
+            new EnemyIntentPattern { Type = EnemyIntentType.Special, Value = 20 + act * 8, Weight = 0.1f },
+        ],
+        Phases =
+        [
+            new EnemyPhase
+            {
+                HpThreshold = 0.5f,
+                EntryEffect = "进入狂暴状态！",
+                IntentPatterns =
+                [
+                    new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 20 + act * 7, Weight = 0.5f },
+                    new EnemyIntentPattern { Type = EnemyIntentType.Special, Value = 25 + act * 10, Weight = 0.3f },
+                    new EnemyIntentPattern { Type = EnemyIntentType.Buff, Value = 5, Weight = 0.2f },
+                ]
+            }
+        ]
+    };
+
+    private void BuildEnemyPanels()
+    {
+        // Clear existing
+        foreach (var child in _enemyArea.GetChildren())
+            child.QueueFree();
+        foreach (var child in _intentArea.GetChildren())
+            child.QueueFree();
+        _enemyPanels.Clear();
+
+        if (_combat == null) return;
+
+        foreach (var enemy in _combat.Enemies)
+        {
+            var panel = new EnemyPanel(enemy);
+            _enemyArea.AddChild(panel.Container);
+            _intentArea.AddChild(panel.IntentLabel);
+            _enemyPanels.Add(panel);
+
+            panel.Container.Pressed += () => OnEnemyClicked(enemy);
+        }
+    }
+
+    private void RefreshAll()
+    {
+        RefreshHand();
+        RefreshPlayerInfo();
+        RefreshEnemies();
+        RefreshDeckInfo();
+    }
+
+    private void RefreshHand()
+    {
+        // Clear existing cards
+        foreach (var child in _handArea.GetChildren())
+            child.QueueFree();
+        _cardButtons.Clear();
+
+        if (_deck == null || _player == null || _combat == null) return;
+
+        foreach (var card in _deck.Hand)
+        {
+            var btn = CreateCardButton(card);
+            _handArea.AddChild(btn);
+            _cardButtons[card] = btn;
+        }
+    }
+
+    private Button CreateCardButton(Card card)
+    {
+        var btn = new Button();
+        btn.CustomMinimumSize = new Vector2(140, 200);
+
+        // Card content
+        string costText = card.EffectiveCost.ToString();
+        string typeIcon = card.Data.Type switch
+        {
+            CardType.Attack => "⚔",
+            CardType.Skill => "🛡",
+            CardType.Power => "⚡",
+            _ => "?"
+        };
+        btn.Text = $"[{costText}] {typeIcon}\n{card.DisplayName}\n\n{card.ActiveDescription}";
+
+        bool canPlay = _combat!.CanPlay(_player!, card);
+
+        // Style based on card type and playability
+        var color = card.Data.Type switch
+        {
+            CardType.Attack => new Color(0.8f, 0.2f, 0.2f),
+            CardType.Skill => new Color(0.2f, 0.5f, 0.8f),
+            CardType.Power => new Color(0.7f, 0.5f, 0.1f),
+            _ => new Color(0.3f, 0.3f, 0.3f)
+        };
+
+        var style = new StyleBoxFlat
+        {
+            BgColor = canPlay ? color * 0.3f : color * 0.1f,
+            BorderColor = canPlay ? color : color * 0.4f,
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 8, ContentMarginRight = 8,
+            ContentMarginTop = 8, ContentMarginBottom = 8
+        };
+        btn.AddThemeStyleboxOverride("normal", style);
+
+        if (canPlay)
+        {
+            var hoverStyle = (StyleBoxFlat)style.Duplicate();
+            hoverStyle.BgColor = color * 0.5f;
+            hoverStyle.BorderColor = new Color(1f, 1f, 1f);
+            btn.AddThemeStyleboxOverride("hover", hoverStyle);
+        }
+
+        btn.AddThemeFontSizeOverride("font_size", 14);
+        btn.AddThemeColorOverride("font_color", canPlay ? Colors.White : new Color(0.5f, 0.5f, 0.5f));
+
+        btn.Pressed += () => OnCardClicked(card);
+        return btn;
+    }
+
+    private void OnCardClicked(Card card)
+    {
+        if (_combat == null || _player == null) return;
+        if (!_combat.CanPlay(_player, card)) return;
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+
+        // Cards targeting self or all enemies play instantly
+        if (card.Data.TargetType is TargetType.Self or TargetType.AllEnemies or
+            TargetType.FrontRowEnemies or TargetType.BackRowEnemies)
+        {
+            _combat.TryPlayCard(_player, card);
+            _selectedCard = null;
+            RefreshAll();
+        }
+        else
+        {
+            // Need to select a target
+            _selectedCard = card;
+            HighlightValidTargets();
+        }
+    }
+
+    private void OnEnemyClicked(Enemy enemy)
+    {
+        if (_selectedCard == null || _combat == null || _player == null) return;
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardPlay);
+
+        if (_combat.TryPlayCard(_player, _selectedCard, enemy))
+        {
+            _selectedCard = null;
+            RefreshAll();
+        }
+    }
+
+    private void HighlightValidTargets()
+    {
+        // Highlight enemies that are valid targets
+        foreach (var panel in _enemyPanels)
+        {
+            bool isValid = _selectedCard != null && _combat != null &&
+                _combat.Targeting.GetValidTargets(
+                    _player!, _selectedCard.Data.TargetType, _selectedCard.Data.Range,
+                    _combat.Enemies.Where(e => e.IsAlive),
+                    _combat.Players.Where(p => p.IsAlive))
+                .Contains(panel.Enemy);
+
+            panel.SetHighlight(isValid);
+        }
+    }
+
+    private void OnEndTurnPressed()
+    {
+        if (_combat == null || !_combat.IsActive) return;
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+        _selectedCard = null;
+
+        _combat.EndPlayerTurn();
+
+        if (_combat.IsActive)
+            RefreshAll();
+    }
+
+    private void OnSwitchRowPressed()
+    {
+        if (_combat == null || _player == null) return;
+
+        if (_combat.TrySwitchRow(_player))
+        {
+            AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+            RefreshAll();
+        }
+    }
+
+    private void RefreshPlayerInfo()
+    {
+        if (_player == null || _combat == null) return;
+
+        _hpBar.MaxValue = _player.MaxHp;
+        _hpBar.Value = _player.CurrentHp;
+
+        var hpStyle = new StyleBoxFlat { BgColor = new Color(0.8f, 0.1f, 0.1f) };
+        _hpBar.AddThemeStyleboxOverride("fill", hpStyle);
+
+        _energyLabel.Text = $"能量: {_player.CurrentEnergy}/{_player.MaxEnergy}";
+        _energyLabel.AddThemeColorOverride("font_color",
+            _player.CurrentEnergy > 0 ? new Color(0f, 0.95f, 0.95f) : new Color(0.5f, 0.5f, 0.5f));
+
+        _blockLabel.Text = $"护甲: {_player.Block}";
+        _blockLabel.AddThemeColorOverride("font_color",
+            _player.Block > 0 ? new Color(0.4f, 0.7f, 1f) : new Color(0.5f, 0.5f, 0.5f));
+
+        // Class resource
+        var resName = _player.EffectiveClassResourceName;
+        if (!string.IsNullOrEmpty(resName))
+        {
+            _classResourceLabel.Text = $"{resName}: {_player.ClassResourceValue}";
+            _classResourceLabel.Visible = true;
+        }
+        else
+        {
+            _classResourceLabel.Visible = false;
+        }
+
+        // Formation row
+        var row = _combat.Formation.GetPosition(_player.Id);
+        _rowLabel.Text = row == FormationRow.Front ? "前排" : "后排";
+        _rowLabel.AddThemeColorOverride("font_color",
+            row == FormationRow.Front ? new Color(1f, 0.6f, 0.2f) : new Color(0.4f, 0.8f, 1f));
+
+        _switchRowBtn.Text = _player.CurrentEnergy >= 1 ? "切换阵型 (1能量)" : "能量不足";
+        _switchRowBtn.Disabled = _player.CurrentEnergy < 1 || _player.StatusEffects.Has(StatusType.Rooted);
+    }
+
+    private void RefreshEnemies()
+    {
+        if (_combat == null) return;
+
+        foreach (var panel in _enemyPanels)
+        {
+            panel.Update(_combat.Formation);
+        }
+    }
+
+    private void RefreshDeckInfo()
+    {
+        if (_deck == null) return;
+
+        _drawPileLabel.Text = $"抽牌堆: {_deck.DrawPile.Count}";
+        _discardPileLabel.Text = $"弃牌堆: {_deck.DiscardPile.Count}";
+        _exhaustPileLabel.Text = $"消耗堆: {_deck.ExhaustPile.Count}";
+    }
+
+    // Combat event handlers
+    private void OnCardPlayed(PlayerCharacter player, Card card)
+    {
+        GD.Print($"[Combat] Played: {card.DisplayName}");
+    }
+
+    private void OnDamageDealt(Combatant target, int damage)
+    {
+        SpawnDamageNumber(damage, target);
+    }
+
+    private void OnEnemyAction(Enemy enemy, EnemyIntent intent)
+    {
+        GD.Print($"[Combat] {enemy.Name}: {intent.Type} {intent.Value}");
+        RefreshAll();
+    }
+
+    private void OnCombatEnded(bool victory)
+    {
+        GD.Print($"[Combat] Ended: {(victory ? "Victory" : "Defeat")}");
+
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        if (victory)
+        {
+            var node = run.CurrentMap?.CurrentNode;
+            bool isElite = node?.Type == RoomType.EliteCombat;
+            bool isBoss = node?.Type == RoomType.Boss;
+            run.OnCombatVictory(isElite, isBoss);
+
+            if (isBoss)
+            {
+                if (run.CurrentAct >= 3)
+                {
+                    SceneManager.Instance.ChangeScene(SceneManager.Scenes.Victory);
+                }
+                else
+                {
+                    run.AdvanceAct();
+                    SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+                }
+            }
+            else
+            {
+                SceneManager.Instance.ChangeScene(SceneManager.Scenes.Reward);
+            }
+        }
+        else
+        {
+            run.EndRun(false);
+            SceneManager.Instance.ChangeScene(SceneManager.Scenes.GameOver);
+        }
+    }
+
+    private void SpawnDamageNumber(int damage, Combatant target)
+    {
+        var label = new Label();
+        label.Text = $"-{damage}";
+        label.AddThemeFontSizeOverride("font_size", 28);
+        label.AddThemeColorOverride("font_color", new Color(1f, 0.2f, 0.2f));
+        label.Position = new Vector2(
+            (float)GD.RandRange(300, 1600),
+            (float)GD.RandRange(100, 400));
+        _damageNumbers.AddChild(label);
+
+        var tween = CreateTween();
+        tween.TweenProperty(label, "position:y", label.Position.Y - 60, 0.8f);
+        tween.Parallel().TweenProperty(label, "modulate:a", 0f, 0.8f);
+        tween.TweenCallback(Callable.From(() => label.QueueFree()));
+    }
+
+    /// <summary>
+    /// Helper class to manage an enemy's UI panel.
+    /// </summary>
+    private class EnemyPanel
+    {
+        public Enemy Enemy { get; }
+        public Button Container { get; }
+        public Label IntentLabel { get; }
+        private Label _nameLabel = null!;
+        private ProgressBar _hpBar = null!;
+        private Label _hpText = null!;
+        private Label _blockText = null!;
+        private Label _statusText = null!;
+
+        public EnemyPanel(Enemy enemy)
+        {
+            Enemy = enemy;
+
+            Container = new Button();
+            Container.CustomMinimumSize = new Vector2(180, 220);
+
+            var vbox = new VBoxContainer();
+            Container.AddChild(vbox);
+
+            _nameLabel = new Label { Text = enemy.Name, HorizontalAlignment = HorizontalAlignment.Center };
+            _nameLabel.AddThemeFontSizeOverride("font_size", 18);
+            _nameLabel.AddThemeColorOverride("font_color", enemy.Data.IsBoss ? new Color(1f, 0.2f, 0.2f) :
+                enemy.Data.IsElite ? new Color(1f, 0.6f, 0.1f) : Colors.White);
+            vbox.AddChild(_nameLabel);
+
+            _hpBar = new ProgressBar
+            {
+                MaxValue = enemy.MaxHp,
+                Value = enemy.CurrentHp,
+                CustomMinimumSize = new Vector2(160, 20),
+                ShowPercentage = false
+            };
+            var hpFill = new StyleBoxFlat { BgColor = new Color(0.8f, 0.1f, 0.1f) };
+            _hpBar.AddThemeStyleboxOverride("fill", hpFill);
+            vbox.AddChild(_hpBar);
+
+            _hpText = new Label
+            {
+                Text = $"{enemy.CurrentHp}/{enemy.MaxHp}",
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            _hpText.AddThemeFontSizeOverride("font_size", 14);
+            vbox.AddChild(_hpText);
+
+            _blockText = new Label
+            {
+                Text = "",
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            _blockText.AddThemeFontSizeOverride("font_size", 14);
+            _blockText.AddThemeColorOverride("font_color", new Color(0.4f, 0.7f, 1f));
+            vbox.AddChild(_blockText);
+
+            _statusText = new Label
+            {
+                Text = "",
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            _statusText.AddThemeFontSizeOverride("font_size", 12);
+            vbox.AddChild(_statusText);
+
+            IntentLabel = new Label { HorizontalAlignment = HorizontalAlignment.Center };
+            IntentLabel.AddThemeFontSizeOverride("font_size", 16);
+
+            // Style container
+            var style = new StyleBoxFlat
+            {
+                BgColor = new Color(0.12f, 0.12f, 0.18f),
+                BorderColor = new Color(0.3f, 0.3f, 0.4f),
+                BorderWidthBottom = 2, BorderWidthTop = 2,
+                BorderWidthLeft = 2, BorderWidthRight = 2,
+                CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+                CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+                ContentMarginLeft = 8, ContentMarginRight = 8,
+                ContentMarginTop = 8, ContentMarginBottom = 8
+            };
+            Container.AddThemeStyleboxOverride("normal", style);
+        }
+
+        public void Update(FormationSystem formation)
+        {
+            _hpBar.Value = Enemy.CurrentHp;
+            _hpText.Text = $"{Enemy.CurrentHp}/{Enemy.MaxHp}";
+            _blockText.Text = Enemy.Block > 0 ? $"🛡 {Enemy.Block}" : "";
+
+            // Update intent
+            if (Enemy.CurrentIntent != null)
+            {
+                var intent = Enemy.CurrentIntent;
+                IntentLabel.Text = intent.Type switch
+                {
+                    EnemyIntentType.Attack => $"⚔ {intent.Value}" + (intent.HitCount > 1 ? $" x{intent.HitCount}" : ""),
+                    EnemyIntentType.AttackDefend => $"⚔🛡 {intent.Value}",
+                    EnemyIntentType.Defend => $"🛡 {intent.Value}",
+                    EnemyIntentType.Buff => "↑ 强化",
+                    EnemyIntentType.Debuff => "↓ 削弱",
+                    EnemyIntentType.Heal => "💚 治疗",
+                    EnemyIntentType.Special => "💀 特殊",
+                    _ => "?"
+                };
+                IntentLabel.AddThemeColorOverride("font_color", intent.Type switch
+                {
+                    EnemyIntentType.Attack => new Color(1f, 0.3f, 0.3f),
+                    EnemyIntentType.AttackDefend => new Color(1f, 0.6f, 0.3f),
+                    EnemyIntentType.Defend => new Color(0.4f, 0.7f, 1f),
+                    _ => new Color(0.8f, 0.8f, 0.8f)
+                });
+            }
+
+            // Row indicator
+            var row = formation.GetPosition(Enemy.Id);
+            _nameLabel.Text = Enemy.Name + (row == FormationRow.Back ? " (后排)" : "");
+
+            // Alive state
+            Container.Visible = Enemy.IsAlive;
+            IntentLabel.Visible = Enemy.IsAlive;
+        }
+
+        public void SetHighlight(bool highlighted)
+        {
+            var color = highlighted ? new Color(0f, 1f, 1f) : new Color(0.3f, 0.3f, 0.4f);
+            var style = new StyleBoxFlat
+            {
+                BgColor = highlighted ? new Color(0.15f, 0.2f, 0.25f) : new Color(0.12f, 0.12f, 0.18f),
+                BorderColor = color,
+                BorderWidthBottom = highlighted ? 3 : 2,
+                BorderWidthTop = highlighted ? 3 : 2,
+                BorderWidthLeft = highlighted ? 3 : 2,
+                BorderWidthRight = highlighted ? 3 : 2,
+                CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+                CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+                ContentMarginLeft = 8, ContentMarginRight = 8,
+                ContentMarginTop = 8, ContentMarginBottom = 8
+            };
+            Container.AddThemeStyleboxOverride("normal", style);
+        }
+    }
+}

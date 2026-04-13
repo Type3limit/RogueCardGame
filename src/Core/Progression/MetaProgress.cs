@@ -17,7 +17,6 @@ public class MetaProgress
 {
     // ─── Unlocks ───
     public HashSet<string> UnlockedCards { get; set; } = new();
-    public HashSet<string> UnlockedRelics { get; set; } = new();
     public HashSet<string> UnlockedImplants { get; set; } = new();
     public HashSet<string> UnlockedClasses { get; set; } = new() { "vanguard" }; // Vanguard unlocked by default
     public HashSet<string> CompletedAchievements { get; set; } = new();
@@ -38,11 +37,6 @@ public class MetaProgress
     public bool TryUnlockCard(string cardId)
     {
         return UnlockedCards.Add(cardId);
-    }
-
-    public bool TryUnlockRelic(string relicId)
-    {
-        return UnlockedRelics.Add(relicId);
     }
 
     public bool TryUnlockClass(string classId)
@@ -151,8 +145,6 @@ public class PlayerStats
     public int HighestFloor { get; set; }
     public int TotalPlayTimeMinutes { get; set; }
     public int TotalCardsPlayed { get; set; }
-    public int TotalLinksTriggered { get; set; }
-    public int TotalEnemiesHacked { get; set; }
     public int TotalImplantsEquipped { get; set; }
     public int FastestWinMinutes { get; set; } = int.MaxValue;
 
@@ -175,8 +167,6 @@ public class RunRecord
     public long DamageDealt { get; set; }
     public int GoldEarned { get; set; }
     public int CardsPlayed { get; set; }
-    public int LinksTriggered { get; set; }
-    public List<string> RelicsCollected { get; set; } = new();
     public List<string> ImplantsUsed { get; set; } = new();
     public string DeathCause { get; set; } = "";
     public bool IsMultiplayer { get; set; }

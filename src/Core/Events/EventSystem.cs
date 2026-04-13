@@ -17,12 +17,11 @@ public enum EventChoiceEffect
     LoseMaxHp,
     GainCard,
     RemoveCard,
-    GainRelic,
     GainPotion,
-    GainParts,
-    LoseParts,
     UpgradeCard,
     GainImplant,
+    GainRelic,
+    GainParts,
     StartCombat,
     Nothing
 }
@@ -60,7 +59,6 @@ public sealed class EventData
     public required List<EventChoice> Choices { get; init; }
     public int MinAct { get; init; } = 1;
     public int MaxAct { get; init; } = 99;
-    public string? RequiredRelic { get; init; }
     public bool IsOneTime { get; init; } = false;
     public string? ArtPath { get; init; }
 }

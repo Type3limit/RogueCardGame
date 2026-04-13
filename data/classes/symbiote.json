@@ -1,0 +1,25 @@
+{
+  "id": "symbiote",
+  "name": "共生体",
+  "nameEn": "Symbiote",
+  "description": "生物融合战士，以自身HP为代价换取强大输出与恢复。高风险高回报。",
+  "maxHp": 75,
+  "startRow": "front",
+  "baseEnergy": 3,
+  "drawPerTurn": 5,
+  "classResource": {
+    "id": "erosion",
+    "statusType": "Erosion",
+    "displayName": "侵蚀",
+    "displayNameEn": "Erosion",
+    "startValue": 0
+  },
+  "starterDeckCardIds": [
+    "bio_strike", "bio_strike", "bio_strike", "bio_strike",
+    "carapace", "carapace", "carapace", "carapace",
+    "symbiotic_link"
+  ],
+  "unlockCondition": "reach_floor_30",
+  "color": "#22C55E",
+  "iconPath": "res://resources/textures/characters/symbiote_icon.png"
+}

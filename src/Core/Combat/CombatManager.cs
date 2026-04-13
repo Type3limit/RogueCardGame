@@ -1,12 +1,15 @@
 using RogueCardGame.Core.Cards;
 using RogueCardGame.Core.Characters;
+using RogueCardGame.Core.Combat.Actions;
+using RogueCardGame.Core.Combat.Powers;
 using RogueCardGame.Core.Deck;
 
 namespace RogueCardGame.Core.Combat;
 
 /// <summary>
 /// Main combat manager that orchestrates a complete battle encounter.
-/// Coordinates all subsystems: turns, formation, aggro, targeting, energy, effects.
+/// Uses ActionManager (STS-style action queue) for cascading effects.
+/// Powers on combatants provide lifecycle hooks for extensible mechanics.
 /// </summary>
 public class CombatManager
 {
@@ -16,7 +19,11 @@ public class CombatManager
     public AggroSystem Aggro { get; }
     public TargetingSystem Targeting { get; }
     public EnemyAI EnemyAI { get; }
+    public ActionManager Actions { get; }
     private readonly SeededRandom _random;
+
+    // Card database reference
+    private CardDatabase? _cardDb;
 
     // Combatants
     public List<PlayerCharacter> Players { get; } = [];
@@ -33,8 +40,9 @@ public class CombatManager
     public event Action<Combatant, int>? OnDamageDealt;
     public event Action<Combatant, int>? OnBlockGained;
     public event Action<bool>? OnCombatEnded;
+    public event Action<string>? OnPhaseTransition;
 
-    public CombatManager(int seed)
+    public CombatManager(int seed, CardDatabase? cardDb = null)
     {
         _random = new SeededRandom(seed);
         TurnSystem = new TurnSystem();
@@ -42,6 +50,8 @@ public class CombatManager
         Aggro = new AggroSystem();
         Targeting = new TargetingSystem(Formation, Aggro);
         EnemyAI = new EnemyAI(_random);
+        Actions = new ActionManager { Combat = this };
+        _cardDb = cardDb;
     }
 
     /// <summary>
@@ -63,6 +73,7 @@ public class CombatManager
         {
             Players.Add(player);
             Formation.SetPosition(player.Id, player.PreferredRow);
+            player.Powers.ActionManager = Actions;
 
             if (playerDecks.TryGetValue(player.Id, out var cards))
             {
@@ -77,6 +88,7 @@ public class CombatManager
         {
             Enemies.Add(enemy);
             Formation.SetPosition(enemy.Id, enemy.Data.PreferredRow);
+            enemy.Powers.ActionManager = Actions;
         }
     }
 
@@ -108,10 +120,24 @@ public class CombatManager
 
         // Roll enemy intents for this turn
         var state = GetCombatState();
-        foreach (var enemy in Enemies.Where(e => e.IsAlive && !e.IsHacked))
+        foreach (var enemy in Enemies.Where(e => e.IsAlive))
         {
             enemy.CurrentIntent = EnemyAI.SelectIntent(enemy, state);
         }
+    }
+
+    /// <summary>
+    /// Check if a card can be played by the player considering formation restrictions.
+    /// Back-row players cannot play melee cards.
+    /// </summary>
+    public bool CanPlay(PlayerCharacter player, Card card)
+    {
+        if (!player.CanPlayCard(card)) return false;
+        // Back-row restriction: melee cards are disabled
+        if (Formation.GetPosition(player.Id) == FormationRow.Back &&
+            card.Data.Range == CardRange.Melee)
+            return false;
+        return true;
     }
 
     /// <summary>
@@ -123,7 +149,7 @@ public class CombatManager
         if (TurnSystem.CurrentPhase != CombatPhase.PlayerPlanningPhase)
             return false;
 
-        if (!player.CanPlayCard(card))
+        if (!CanPlay(player, card))
             return false;
 
         var deck = PlayerDecks.GetValueOrDefault(player.Id);
@@ -160,7 +186,22 @@ public class CombatManager
         // Remove from hand
         deck.PlayFromHand(card);
 
-        // Execute effects
+        // Resolve effects: position-reactive cards choose effects by current row
+        List<CardEffectData> effectsToRun;
+        if (card.IsPositionReactive)
+        {
+            var playerRow = Formation.GetPosition(player.Id);
+            effectsToRun = card.GetEffectsForRow(playerRow);
+        }
+        else
+        {
+            effectsToRun = card.ActiveEffects;
+        }
+
+        // Handle overloadConsume keyword — OverchargeConsumeEffect/Action handles stack reading & removal
+        // No-op here: stacks are read and removed inside the effect/action itself
+
+        // Execute effects via action queue
         var context = new CardEffectContext
         {
             Source = player,
@@ -169,17 +210,44 @@ public class CombatManager
             Formation = Formation,
             Aggro = Aggro,
             Card = card,
-            Range = card.Data.Range
+            Range = card.Data.Range,
+            Actions = Actions,
+            Deck = deck,
+            CardDb = _cardDb,
+            DrawCardCallback = count =>
+            {
+                if (PlayerDecks.TryGetValue(player.Id, out var d))
+                    d.Draw(count);
+            },
+            AddToDiscardCallback = cardId =>
+            {
+                if (_cardDb != null && PlayerDecks.TryGetValue(player.Id, out var d))
+                {
+                    var newCard = _cardDb.CreateCard(cardId);
+                    if (newCard != null) d.AddToDiscard(newCard);
+                }
+            }
         };
 
-        var effect = CardEffectFactory.CreateComposite(card.ActiveEffects);
+        var effect = CardEffectFactory.CreateComposite(effectsToRun);
         effect.Execute(context);
 
-        // Move to discard (unless exhausted by effect)
+        // Drain the action queue — all enqueued actions execute with cascading
+        Actions.ProcessAll();
+
+        // Record ranged plays for the bonus tracking
+        if (card.Data.Range == CardRange.Ranged)
+            Formation.RecordRangedPlay(player.Id);
+
+        // Move to discard (unless power card)
         if (card.Data.Type != CardType.Power)
             deck.MoveToDiscard(card);
 
         OnCardPlayed?.Invoke(player, card);
+
+        // Trigger power hooks for card played
+        player.Powers.TriggerOnCardPlayed(card);
+        Actions.ProcessAll();
 
         // Check victory
         CheckCombatEnd();
@@ -209,22 +277,29 @@ public class CombatManager
     /// </summary>
     private void ExecuteEnemyPhase()
     {
+        // Reset enemy block at start of their turn (STS-style)
+        foreach (var enemy in Enemies.Where(e => e.IsAlive))
+        {
+            enemy.OnTurnStart();
+        }
+
         foreach (var enemy in Enemies.Where(e => e.IsAlive).ToList())
         {
-            if (enemy.IsHacked)
-            {
-                // Hacked enemies attack other enemies
-                enemy.TickHack();
-                continue;
-            }
-
             if (enemy.CurrentIntent != null)
             {
                 EnemyAI.ExecuteIntent(
                     enemy, enemy.CurrentIntent,
                     Targeting, Players, Formation, Aggro);
                 OnEnemyAction?.Invoke(enemy, enemy.CurrentIntent);
+
+                // Drain any actions enqueued by power hooks during enemy actions
+                Actions.ProcessAll();
             }
+
+            // Check phase transitions after each enemy action resolves
+            string? phaseMsg = enemy.CheckPhaseTransition();
+            if (phaseMsg != null)
+                OnPhaseTransition?.Invoke($"{enemy.Data.Name}: {phaseMsg}");
         }
 
         // Check for downed players
@@ -292,11 +367,27 @@ public class CombatManager
 
     /// <summary>
     /// Try to switch a player's formation row.
+    /// Costs 1 energy normally; Rooted (Locked) status prevents switching entirely.
     /// </summary>
     public bool TrySwitchRow(PlayerCharacter player, bool free = false)
     {
-        return Formation.TrySwitchRow(player.Id, free);
+        // Rooted players cannot switch rows
+        if (player.Powers.HasPower(CommonPowerIds.Rooted))
+            return false;
+
+        if (!free && player.CurrentEnergy < 1)
+            return false;
+
+        if (!Formation.TrySwitchRow(player.Id, free))
+            return false;
+
+        if (!free)
+            player.SpendEnergy(1);
+
+        return true;
     }
+
+    public void SetCardDatabase(CardDatabase db) => _cardDb = db;
 
     public CombatState GetCombatState() => new()
     {

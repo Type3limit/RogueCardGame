@@ -59,6 +59,3 @@ public record EnemyIntentRevealedEvent(int EnemyId, string IntentType, int Value
 public record CombatEndedEvent(bool Victory);
 public record PlayerDownedEvent(int PlayerId);
 public record PlayerRevivedEvent(int PlayerId);
-public record HackProgressEvent(int EnemyId, int CurrentProgress, int Threshold);
-public record EnemyHackedEvent(int EnemyId);
-public record LinkActivatedEvent(int Player1Id, int Player2Id, string LinkCardId);

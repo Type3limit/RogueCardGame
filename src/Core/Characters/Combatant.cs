@@ -1,9 +1,12 @@
 using RogueCardGame.Core.Combat;
+using RogueCardGame.Core.Combat.Powers;
 
 namespace RogueCardGame.Core.Characters;
 
 /// <summary>
 /// Base class for all combatants (players and enemies).
+/// Powers drive all buff/debuff mechanics via lifecycle hooks (STS-style).
+/// StatusEffects is a thin facade over Powers for backward compatibility.
 /// </summary>
 public abstract class Combatant
 {
@@ -14,7 +17,13 @@ public abstract class Combatant
     public int MaxHp { get; set; }
     public int CurrentHp { get; set; }
     public int Block { get; set; }
+
+    /// <summary>New STS-style power system — drives all buff/debuff mechanics.</summary>
+    public PowerManager Powers { get; } = new();
+
+    /// <summary>Legacy facade — delegates to PowerManager under the hood.</summary>
     public StatusEffectManager StatusEffects { get; } = new();
+
     public bool IsAlive => CurrentHp > 0;
 
     protected Combatant(string name, int maxHp)
@@ -23,18 +32,19 @@ public abstract class Combatant
         Name = name;
         MaxHp = maxHp;
         CurrentHp = maxHp;
+        StatusEffects.SetOwner(this);
     }
 
     /// <summary>
-    /// Take damage after all modifiers. Returns actual damage dealt.
+    /// Take damage after power modifiers (Vulnerable, Firewall, etc.).
+    /// Returns actual HP damage dealt (after block absorption).
     /// </summary>
     public int TakeDamage(int amount)
     {
         if (amount <= 0) return 0;
 
-        // Vulnerable: +50% damage
-        if (StatusEffects.Has(StatusType.Vulnerable))
-            amount = (int)(amount * 1.5f);
+        // Power modifiers on incoming damage (Vulnerable +50%, Firewall reduction, etc.)
+        amount = Math.Max(0, (int)Powers.ModifyDamageTaken(amount));
 
         // Block absorbs damage first
         int blocked = Math.Min(Block, amount);
@@ -46,15 +56,14 @@ public abstract class Combatant
     }
 
     /// <summary>
-    /// Gain block (armor). Applies formation bonus externally.
+    /// Gain block (armor). Modified by powers (Frail, Dexterity, etc.).
     /// </summary>
     public void GainBlock(int amount)
     {
         if (amount <= 0) return;
 
-        // Frail: -25% block gain
-        if (StatusEffects.Has(StatusType.Frail))
-            amount = (int)(amount * 0.75f);
+        // Power modifiers on block gain (Frail -25%, Dexterity +X, etc.)
+        amount = Math.Max(0, (int)Powers.ModifyBlockGain(amount));
 
         Block += amount;
     }
@@ -76,41 +85,35 @@ public abstract class Combatant
     public virtual void OnTurnStart()
     {
         Block = 0; // Block resets each turn by default
+        Powers.TriggerAtTurnStart();
     }
 
     /// <summary>
-    /// Called at the end of each turn. Process status effects.
+    /// Called at the end of each turn. Powers handle poison, regen, tick-down, etc.
     /// </summary>
     public virtual void OnTurnEnd()
     {
-        // Poison damage
-        int poison = StatusEffects.GetStacks(StatusType.Poison);
-        if (poison > 0)
-            TakeDamage(poison);
-
-        // Regeneration
-        int regen = StatusEffects.GetStacks(StatusType.Regeneration);
-        if (regen > 0)
-            Heal(regen);
-
-        // Tick all effects
-        StatusEffects.TickAll();
+        // Powers handle all end-of-turn effects:
+        // - PoisonPower deals damage and ticks down
+        // - RegenerationPower heals and ticks down
+        // - Vulnerable/Weak/Frail tick down
+        // - Custom powers can inject their own behavior
+        Powers.TriggerAtTurnEnd();
     }
 
     /// <summary>
-    /// Calculate outgoing attack damage with modifiers.
+    /// Calculate outgoing attack damage with power modifiers (Strength, Weak, etc.).
     /// </summary>
     public int CalculateAttackDamage(int baseDamage, FormationSystem? formation = null)
     {
-        int damage = baseDamage;
+        float damage = baseDamage;
 
-        // Strength bonus
-        damage += StatusEffects.GetStacks(StatusType.Strength);
+        // Strength adds flat damage
+        damage += Powers.GetStacks(CommonPowerIds.Strength);
 
-        // Weak: -25%
-        if (StatusEffects.Has(StatusType.Weak))
-            damage = (int)(damage * 0.75f);
+        // Multiplicative modifiers (Weak -25%, etc.)
+        damage = Powers.ModifyAttackDamage(damage);
 
-        return Math.Max(0, damage);
+        return Math.Max(0, (int)damage);
     }
 }

@@ -70,8 +70,6 @@ public class GameRunner
                 Name = "测试无人机",
                 MaxHp = 24,
                 PreferredRow = FormationRow.Back,
-                IsHackable = true,
-                HackThreshold = 8,
                 IntentPatterns =
                 [
                     new() { Type = EnemyIntentType.Attack, Value = 5, Scope = TargetScope.SingleAny, Weight = 2 },

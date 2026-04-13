@@ -1,5 +1,6 @@
 using RogueCardGame.Core.Cards;
 using RogueCardGame.Core.Combat;
+using RogueCardGame.Core.Combat.Powers;
 
 namespace RogueCardGame.Core.Characters;
 
@@ -23,8 +24,10 @@ public class PlayerCharacter : Combatant
     public bool IsDowned { get; set; }
     public int DownedTurnsLeft { get; set; }
 
-    // Class-specific resource display
-    public string ClassResourceName => Class switch
+    // Class-specific resource display name (can be overridden by ClassDatabase)
+    public string ClassResourceName { get; set; } = "";
+
+    private string DefaultClassResourceName => Class switch
     {
         CardClass.Vanguard => "超载",
         CardClass.Psion => "共鸣",
@@ -33,10 +36,13 @@ public class PlayerCharacter : Combatant
         _ => ""
     };
 
+    public string EffectiveClassResourceName => 
+        string.IsNullOrEmpty(ClassResourceName) ? DefaultClassResourceName : ClassResourceName;
+
     public int ClassResourceValue => Class switch
     {
-        CardClass.Vanguard => StatusEffects.GetStacks(StatusType.Overcharge),
-        CardClass.Psion => StatusEffects.GetStacks(StatusType.Resonance),
+        CardClass.Vanguard => Powers.GetStacks(CommonPowerIds.Overcharge),
+        CardClass.Psion => Powers.GetStacks(CommonPowerIds.Resonance),
         _ => 0
     };
 

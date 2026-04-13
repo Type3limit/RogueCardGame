@@ -1,3 +1,4 @@
+using RogueCardGame.Core;
 using RogueCardGame.Core.Cards;
 using RogueCardGame.Core.Characters;
 using RogueCardGame.Core.Combat;
@@ -7,7 +8,6 @@ using RogueCardGame.Core.Events;
 using RogueCardGame.Core.Implants;
 using RogueCardGame.Core.Map;
 using RogueCardGame.Core.Potions;
-using RogueCardGame.Core.Relics;
 using RogueCardGame.Core.Shop;
 
 namespace RogueCardGame.Core.Run;
@@ -28,11 +28,8 @@ public class RunState
     public int Gold { get; set; } = 99;
 
     // Per-run systems
-    public RelicManager Relics { get; } = new();
     public PotionManager Potions { get; } = new();
     public ImplantManager Implants { get; } = new();
-    public HackSystem HackSystem { get; } = new();
-    public AdaptiveAI AdaptiveAI { get; } = new();
 
     // Map
     public ActMap? CurrentMap { get; set; }
@@ -41,10 +38,10 @@ public class RunState
 
     // Databases
     public CardDatabase CardDb { get; } = new();
-    public RelicDatabase RelicDb { get; } = new();
     public PotionDatabase PotionDb { get; } = new();
     public ImplantDatabase ImplantDb { get; } = new();
     public EventDatabase EventDb { get; } = new();
+    public ClassDatabase ClassDb { get; } = new();
 
     // State flags
     public bool IsRunActive { get; set; }
@@ -56,18 +53,26 @@ public class RunState
     public event Action<int>? OnActChanged;
     public event Action<int>? OnGoldChanged;
 
-    public RunState(int seed, CardClass playerClass)
+    public RunState(int seed, CardClass playerClass, string? dataDirectory = null)
     {
         Seed = seed;
         Random = new SeededRandom(seed);
-        Player = playerClass switch
+
+        // Load class definitions if dataDirectory provided
+        if (dataDirectory != null)
         {
-            CardClass.Vanguard => PlayerCharacter.CreateVanguard(),
-            CardClass.Psion => PlayerCharacter.CreatePsion(),
-            CardClass.Netrunner => PlayerCharacter.CreateNetrunner(),
-            CardClass.Symbiote => PlayerCharacter.CreateSymbiote(),
-            _ => PlayerCharacter.CreateVanguard()
-        };
+            string classesDir = Path.Combine(dataDirectory, "classes");
+            if (Directory.Exists(classesDir))
+                ClassDb.LoadFromDirectory(classesDir);
+        }
+
+        // Use ClassDatabase to create character (falls back to basic constructor)
+        var classDef = ClassDb.GetClassByEnum(playerClass);
+        Player = classDef != null
+            ? ClassDatabase.CreateCharacter(classDef)
+            : new PlayerCharacter(playerClass.ToString(), playerClass, 75);
+
+        Gold = BalanceConfig.Current.GlobalBalance.StartingGold;
     }
 
     /// <summary>
@@ -132,25 +137,26 @@ public class RunState
         return MasterDeck.Remove(card);
     }
 
+    // Prototype Core system — auto-activates after observing early play patterns
+    public PrototypeCoreSystem PrototypeCore { get; } = new();
+
     /// <summary>
     /// Create a combat encounter from the current run state.
     /// </summary>
     public CombatManager CreateCombat(List<Characters.Enemy> enemies)
     {
-        var combat = new CombatManager(Random.Next(int.MaxValue));
+        var combat = new CombatManager(Random.Next(int.MaxValue), CardDb);
 
         // Create deck copies for combat
         var combatDeck = MasterDeck.Select(c => c.Clone()).ToList();
 
         // Apply implant bonuses
-        Player.MaxEnergy = 3 + Implants.GetTotalBonus("energy");
-        Player.DrawPerTurn = 5 + Implants.GetTotalBonus("drawPerTurn");
+        var classDef = ClassDb.GetClassByEnum(Player.Class);
+        int baseEnergy = classDef?.BaseEnergy ?? BalanceConfig.Current.GlobalBalance.BaseEnergyPerTurn;
+        int baseDraw = classDef?.DrawPerTurn ?? BalanceConfig.Current.GlobalBalance.BaseDrawPerTurn;
+        Player.MaxEnergy = baseEnergy + Implants.GetTotalBonus("energy");
+        Player.DrawPerTurn = baseDraw + Implants.GetTotalBonus("drawPerTurn");
         Player.MaxHp = Player.MaxHp + Implants.GetTotalBonus("maxHp");
-
-        // Apply relic passive bonuses
-        int relicStrength = Relics.GetPassiveBonus("strength");
-        if (relicStrength > 0)
-            Player.StatusEffects.Apply(StatusType.Strength, relicStrength);
 
         var playerDecks = new Dictionary<int, List<Card>>
         {
@@ -168,22 +174,17 @@ public class RunState
     {
         FloorsCleared++;
 
-        // Gold reward
-        int goldReward = wasBoss ? 100 : wasElite ? 50 : Random.Next(15, 30);
+        var gb = BalanceConfig.Current.GlobalBalance;
+        int goldReward = wasBoss ? gb.BossGoldReward
+            : wasElite ? gb.EliteGoldReward
+            : Random.Next(gb.NormalGoldRewardMin, gb.NormalGoldRewardMax);
         AddGold(goldReward);
 
-        // Parts reward
-        int partsReward = wasBoss ? 30 : wasElite ? 15 : Random.Next(3, 8);
-        HackSystem.Parts += partsReward;
-
         // Potion drop chance
-        if (Random.NextDouble() < 0.4)
+        if (Random.NextDouble() < gb.PotionDropChance)
         {
             // Award random potion (handled by reward screen)
         }
-
-        // Fire relic triggers
-        Relics.FireTrigger(RelicTrigger.OnCombatEnd);
     }
 
     /// <summary>
@@ -192,7 +193,7 @@ public class RunState
     public void AdvanceAct()
     {
         CurrentAct++;
-        if (CurrentAct > 3) // 3 acts total
+        if (CurrentAct > BalanceConfig.Current.MapGeneration.ActsTotal)
         {
             EndRun(true);
             return;
@@ -217,8 +218,7 @@ public class RunState
             PlayerClass = Player.Class,
             Seed = Seed,
             Gold = Gold,
-            CardsInDeck = MasterDeck.Count,
-            RelicsCount = Relics.Relics.Count
+            CardsInDeck = MasterDeck.Count
         };
         OnRunEnded?.Invoke(Result);
     }
@@ -228,7 +228,8 @@ public class RunState
     /// </summary>
     public void Rest()
     {
-        int healAmount = (int)(Player.MaxHp * 0.3f);
+        int healPercent = BalanceConfig.Current.GlobalBalance.RestHealPercent;
+        int healAmount = (int)(Player.MaxHp * healPercent / 100f);
         Player.Heal(healAmount);
     }
 
@@ -238,8 +239,6 @@ public class RunState
 
         if (Directory.Exists(Resolve("cards")))
             CardDb.LoadFromDirectory(Resolve("cards"));
-        if (Directory.Exists(Resolve("relics")))
-            RelicDb.LoadFromDirectory(Resolve("relics"));
         if (Directory.Exists(Resolve("potions")))
             PotionDb.LoadFromDirectory(Resolve("potions"));
         if (Directory.Exists(Resolve("implants")))
@@ -261,5 +260,4 @@ public class RunResult
     public int Seed { get; init; }
     public int Gold { get; init; }
     public int CardsInDeck { get; init; }
-    public int RelicsCount { get; init; }
 }

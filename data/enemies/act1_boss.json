@@ -1,178 +1,63 @@
 [
   {
     "id": "sentinel_ai",
-    "name": "哨戒 AI",
-    "nameEn": "Sentinel AI",
+    "name": "哨戒AI",
+    "maxHp": 250,
+    "preferredRow": "back",
+    "isElite": false,
     "isBoss": true,
-    "hp": 250,
-    "formation": "back",
-    "description": "第一幕Boss。一台古老的安防AI系统，控制着整个区域的防御机器人。",
+    "minHpScalePerPlayer": 50,
+    "intentPatterns": [
+      { "type": "attack", "value": 10, "scope": "singleFront", "weight": 1.0, "description": "激光扫射 10" }
+    ],
     "phases": [
       {
-        "name": "phase1",
         "hpThreshold": 1.0,
-        "description": "常规阶段：交替攻击和召唤",
-        "intents": [
-          {
-            "type": "attack",
-            "damage": 12,
-            "target": "highestAggro",
-            "weight": 30,
-            "description": "激光扫射"
-          },
-          {
-            "type": "attackAll",
-            "damage": 6,
-            "target": "frontRow",
-            "weight": 20,
-            "description": "前排压制"
-          },
-          {
-            "type": "defend",
-            "block": 15,
-            "weight": 15,
-            "description": "启动护盾"
-          },
-          {
-            "type": "summon",
-            "summonId": "patrol_drone",
-            "count": 2,
-            "weight": 20,
-            "description": "释放巡逻无人机",
-            "cooldown": 3
-          },
-          {
-            "type": "buff",
-            "buffId": "Strength",
-            "value": 2,
-            "target": "self",
-            "weight": 15,
-            "description": "战斗分析"
-          }
+        "entryEffect": "哨戒AI启动防御矩阵",
+        "intentPatterns": [
+          { "type": "attack",  "value": 12, "scope": "singleAny",  "weight": 2.0, "description": "激光扫射 12" },
+          { "type": "attack",  "value": 6,  "scope": "allFront",   "weight": 1.5, "description": "前排压制 6 (全排)" },
+          { "type": "defend",  "value": 15, "scope": "self",       "weight": 1.0, "description": "启动护盾 15" },
+          { "type": "summon",  "value": 2,  "scope": "self",       "weight": 1.5, "description": "释放巡逻无人机×2" },
+          { "type": "buff",    "value": 2,  "scope": "self",       "weight": 1.0, "description": "战斗分析 (力量+2)" }
         ]
       },
       {
-        "name": "phase2",
         "hpThreshold": 0.5,
-        "description": "狂暴阶段：HP低于50%时更加激进",
-        "intents": [
-          {
-            "type": "attack",
-            "damage": 18,
-            "target": "highestAggro",
-            "weight": 35,
-            "description": "强化激光"
-          },
-          {
-            "type": "attackAll",
-            "damage": 10,
-            "target": "all",
-            "weight": 25,
-            "description": "全域轰炸"
-          },
-          {
-            "type": "summon",
-            "summonId": "assault_bot",
-            "count": 1,
-            "weight": 15,
-            "description": "召唤突击机器人",
-            "cooldown": 4
-          },
-          {
-            "type": "debuff",
-            "debuffId": "Weak",
-            "value": 2,
-            "target": "allPlayers",
-            "weight": 15,
-            "description": "EMP 脉冲"
-          },
-          {
-            "type": "attackBackRow",
-            "damage": 15,
-            "target": "backRow",
-            "weight": 10,
-            "description": "精准打击后排"
-          }
+        "entryEffect": "⚠️ 哨戒AI进入狂暴模式！伤害大幅提升",
+        "intentPatterns": [
+          { "type": "attack",  "value": 18, "scope": "singleAny",  "weight": 2.0, "description": "强化激光 18" },
+          { "type": "attack",  "value": 10, "scope": "all",        "weight": 1.5, "description": "全域轰炸 10 (全体)" },
+          { "type": "summon",  "value": 1,  "scope": "self",       "weight": 1.0, "description": "召唤突击机器人" },
+          { "type": "debuff",  "value": 2,  "scope": "all",        "weight": 1.5, "description": "EMP脉冲 (全体虚弱2)" },
+          { "type": "attack",  "value": 15, "scope": "singleBack", "weight": 1.0, "keywords": ["lock"], "description": "🔒 精准打击后排 15 [锁定]" }
         ]
       }
-    ],
-    "adaptiveWeight": 0.3,
-    "specialAbilities": [
-      {
-        "id": "firewall",
-        "description": "每 3 回合清除所有入侵进度",
-        "trigger": "everyNTurns",
-        "interval": 3
-      },
-      {
-        "id": "analyze",
-        "description": "Boss 实时适应：每 2 回合根据玩家行为调整意图权重",
-        "trigger": "everyNTurns",
-        "interval": 2
-      }
-    ],
-    "loot": {
-      "gold": { "min": 80, "max": 120 },
-      "relicDrop": true,
-      "implantChance": 0.5
-    }
+    ]
   },
   {
     "id": "patrol_drone",
     "name": "巡逻无人机",
-    "nameEn": "Patrol Drone",
+    "maxHp": 20,
+    "preferredRow": "front",
+    "isElite": false,
     "isBoss": false,
-    "isSummon": true,
-    "hp": 20,
-    "formation": "front",
-    "intents": [
-      {
-        "type": "attack",
-        "damage": 5,
-        "target": "highestAggro",
-        "weight": 60,
-        "description": "激光射击"
-      },
-      {
-        "type": "defend",
-        "block": 5,
-        "target": "allAllies",
-        "weight": 40,
-        "description": "护盾投射"
-      }
+    "intentPatterns": [
+      { "type": "attack", "value": 5,  "scope": "singleFront", "weight": 2.0, "description": "激光射击 5" },
+      { "type": "defend", "value": 5,  "scope": "allEnemies",  "weight": 1.0, "description": "护盾投射 (全体+5)" }
     ]
   },
   {
     "id": "assault_bot",
     "name": "突击机器人",
-    "nameEn": "Assault Bot",
+    "maxHp": 35,
+    "preferredRow": "front",
+    "isElite": false,
     "isBoss": false,
-    "isSummon": true,
-    "hp": 35,
-    "formation": "front",
-    "intents": [
-      {
-        "type": "attack",
-        "damage": 10,
-        "target": "highestAggro",
-        "weight": 50,
-        "description": "重拳打击"
-      },
-      {
-        "type": "attackAll",
-        "damage": 6,
-        "target": "frontRow",
-        "weight": 30,
-        "description": "横扫"
-      },
-      {
-        "type": "buff",
-        "buffId": "Strength",
-        "value": 1,
-        "target": "self",
-        "weight": 20,
-        "description": "过载充能"
-      }
+    "intentPatterns": [
+      { "type": "attack",  "value": 10, "scope": "singleFront", "weight": 2.0, "keywords": ["breakCover"], "description": "💥 重拳打击 10 [破阵]" },
+      { "type": "attack",  "value": 6,  "scope": "allFront",    "weight": 1.5, "description": "横扫 6 (前排全体)" },
+      { "type": "buff",    "value": 1,  "scope": "self",        "weight": 0.5, "description": "过载充能 (力量+1)" }
     ]
   }
 ]

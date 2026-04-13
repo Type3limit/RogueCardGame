@@ -3,8 +3,8 @@ using RogueCardGame.Core.Characters;
 namespace RogueCardGame.Core.Combat;
 
 /// <summary>
-/// Simple enemy AI that selects intents based on weighted patterns.
-/// Foundation for the Adaptive AI system (Phase 4).
+/// Enemy AI that selects intents from weighted phase patterns and executes them.
+/// Supports position keywords: lock (applies Rooted) and breakCover (back-row splash).
 /// </summary>
 public class EnemyAI
 {
@@ -16,11 +16,11 @@ public class EnemyAI
     }
 
     /// <summary>
-    /// Select the next intent for an enemy based on its patterns and weights.
+    /// Select the next intent for an enemy based on its current phase patterns and weights.
     /// </summary>
     public EnemyIntent SelectIntent(Enemy enemy, CombatState state)
     {
-        var patterns = enemy.Data.IntentPatterns;
+        var patterns = enemy.GetActivePatterns();
         if (patterns.Count == 0)
         {
             return new EnemyIntent
@@ -56,6 +56,7 @@ public class EnemyAI
             Value = selected.Value,
             HitCount = selected.HitCount,
             Scope = selected.Scope,
+            Keywords = selected.Keywords,
             Description = selected.Description ?? GetDefaultDescription(selected)
         };
     }
@@ -108,6 +109,9 @@ public class EnemyAI
         FormationSystem formation,
         AggroSystem aggro)
     {
+        bool hasLock = intent.Keywords.Contains("lock", StringComparer.OrdinalIgnoreCase);
+        bool hasBreakCover = intent.Keywords.Contains("breakCover", StringComparer.OrdinalIgnoreCase);
+
         switch (intent.Scope)
         {
             case TargetScope.All:
@@ -115,17 +119,33 @@ public class EnemyAI
                 {
                     for (int i = 0; i < intent.HitCount; i++)
                         p.TakeDamage(enemy.CalculateAttackDamage(intent.Value));
+                    if (hasLock) p.StatusEffects.Apply(StatusType.Rooted, 1, 1);
                 }
                 break;
 
             case TargetScope.AllFront:
-                foreach (var p in players.Where(p =>
-                    p.IsAlive && formation.GetPosition(p.Id) == FormationRow.Front))
+            {
+                var frontPlayers = players
+                    .Where(p => p.IsAlive && formation.GetPosition(p.Id) == FormationRow.Front)
+                    .ToList();
+                foreach (var p in frontPlayers)
                 {
                     for (int i = 0; i < intent.HitCount; i++)
                         p.TakeDamage(enemy.CalculateAttackDamage(intent.Value));
+                    if (hasLock) p.StatusEffects.Apply(StatusType.Rooted, 1, 1);
+                }
+                // BreakCover: splash half damage to back row
+                if (hasBreakCover && frontPlayers.Count > 0)
+                {
+                    int splashDamage = Math.Max(1, enemy.CalculateAttackDamage(intent.Value) / 2);
+                    foreach (var p in players.Where(p =>
+                        p.IsAlive && formation.GetPosition(p.Id) == FormationRow.Back))
+                    {
+                        p.TakeDamage(splashDamage);
+                    }
                 }
                 break;
+            }
 
             case TargetScope.AllBack:
                 foreach (var p in players.Where(p =>
@@ -133,10 +153,12 @@ public class EnemyAI
                 {
                     for (int i = 0; i < intent.HitCount; i++)
                         p.TakeDamage(enemy.CalculateAttackDamage(intent.Value));
+                    if (hasLock) p.StatusEffects.Apply(StatusType.Rooted, 1, 1);
                 }
                 break;
 
             default:
+            {
                 var target = targeting.AutoSelectTarget(
                     intent.Scope,
                     players.Where(p => p.IsAlive),
@@ -146,8 +168,24 @@ public class EnemyAI
                 {
                     for (int i = 0; i < intent.HitCount; i++)
                         target.TakeDamage(enemy.CalculateAttackDamage(intent.Value));
+                    if (hasLock)
+                        target.StatusEffects.Apply(StatusType.Rooted, 1, 1);
+
+                    // BreakCover: splash to back row when hitting front row
+                    if (hasBreakCover && formation.GetPosition(target.Id) == FormationRow.Front)
+                    {
+                        int splashDamage = Math.Max(1, enemy.CalculateAttackDamage(intent.Value) / 2);
+                        foreach (var p in players.Where(p =>
+                            p.IsAlive &&
+                            p.Id != target.Id &&
+                            formation.GetPosition(p.Id) == FormationRow.Back))
+                        {
+                            p.TakeDamage(splashDamage);
+                        }
+                    }
                 }
                 break;
+            }
         }
     }
 
@@ -166,10 +204,13 @@ public class EnemyAI
 
     private static string GetDefaultDescription(EnemyIntentPattern pattern)
     {
+        string keywords = pattern.Keywords.Count > 0
+            ? $" [{string.Join(",", pattern.Keywords)}]"
+            : "";
         return pattern.Type switch
         {
             EnemyIntentType.Attack => $"攻击 {pattern.Value}" +
-                (pattern.HitCount > 1 ? $"×{pattern.HitCount}" : ""),
+                (pattern.HitCount > 1 ? $"×{pattern.HitCount}" : "") + keywords,
             EnemyIntentType.Defend => $"防御 {pattern.Value}",
             EnemyIntentType.Buff => "增益",
             EnemyIntentType.Debuff => "减益",

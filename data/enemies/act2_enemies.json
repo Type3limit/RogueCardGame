@@ -2,92 +2,101 @@
   {
     "id": "cyber_assassin",
     "name": "赛博刺客",
-    "nameEn": "Cyber Assassin",
-    "hp": 45,
-    "formation": "front",
-    "intents": [
-      { "type": "attack", "damage": 12, "target": "highestAggro", "weight": 35, "description": "暗影打击" },
-      { "type": "attack", "damage": 8, "target": "backRow", "weight": 25, "description": "突袭后排" },
-      { "type": "buff", "buffId": "Strength", "value": 2, "target": "self", "weight": 20, "description": "蓄力" },
-      { "type": "defend", "block": 8, "weight": 20, "description": "闪避" }
+    "maxHp": 45,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "minHpScalePerPlayer": 10,
+    "intentPatterns": [
+      { "type": "attack", "value": 12, "scope": "singleAny", "weight": 2.0, "description": "暗影打击 12" },
+      { "type": "attack", "value": 8, "scope": "singleBack", "weight": 1.5, "keywords": ["lock"], "description": "🔒 突袭后排 8 [锁定]" },
+      { "type": "buff",   "value": 2, "scope": "self",       "weight": 1.0, "description": "蓄力 (力量+2)" },
+      { "type": "defend", "value": 8, "scope": "self",       "weight": 1.0, "description": "闪避 8" }
     ]
   },
   {
     "id": "plasma_turret",
     "name": "等离子炮台",
-    "nameEn": "Plasma Turret",
-    "hp": 55,
-    "formation": "back",
-    "intents": [
-      { "type": "attack", "damage": 15, "target": "highestAggro", "weight": 40, "description": "等离子炮击" },
-      { "type": "attackAll", "damage": 8, "target": "all", "weight": 25, "description": "散射" },
-      { "type": "defend", "block": 12, "weight": 20, "description": "装甲护盾" },
-      { "type": "buff", "buffId": "Strength", "value": 1, "target": "self", "weight": 15, "description": "能量充填" }
+    "maxHp": 55,
+    "preferredRow": "back",
+    "isElite": false,
+    "isBoss": false,
+    "minHpScalePerPlayer": 12,
+    "intentPatterns": [
+      { "type": "attack", "value": 15, "scope": "singleAny",  "weight": 2.0, "description": "等离子炮击 15" },
+      { "type": "attack", "value": 8,  "scope": "all",        "weight": 1.5, "description": "散射 8 (全体)" },
+      { "type": "defend", "value": 12, "scope": "self",       "weight": 1.0, "description": "装甲护盾 12" },
+      { "type": "buff",   "value": 1,  "scope": "self",       "weight": 0.5, "description": "能量充填 (力量+1)" }
     ]
   },
   {
     "id": "nanite_swarm",
     "name": "纳米虫群",
-    "nameEn": "Nanite Swarm",
-    "hp": 30,
-    "formation": "front",
-    "intents": [
-      { "type": "attackAll", "damage": 4, "target": "all", "weight": 40, "description": "虫群侵蚀" },
-      { "type": "debuff", "debuffId": "Weak", "value": 1, "target": "random", "weight": 25, "description": "纳米腐蚀" },
-      { "type": "heal", "value": 8, "target": "allAllies", "weight": 20, "description": "纳米修复" },
-      { "type": "attack", "damage": 6, "target": "highestAggro", "weight": 15, "description": "集群攻击" }
+    "maxHp": 30,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "attack",  "value": 4, "scope": "all",       "weight": 2.0, "description": "虫群侵蚀 4 (全体)" },
+      { "type": "debuff",  "value": 1, "scope": "singleAny", "weight": 1.5, "description": "纳米腐蚀 (虚弱1)" },
+      { "type": "heal",    "value": 8, "scope": "allEnemies","weight": 1.0, "description": "纳米修复 (群体恢复8)" },
+      { "type": "attack",  "value": 6, "scope": "singleFront","weight": 0.5,"description": "集群攻击 6" }
     ]
   },
   {
     "id": "mech_guardian",
     "name": "机甲守卫",
-    "nameEn": "Mech Guardian",
-    "hp": 80,
-    "formation": "front",
-    "intents": [
-      { "type": "attack", "damage": 10, "target": "highestAggro", "weight": 30, "description": "重拳" },
-      { "type": "defend", "block": 20, "weight": 25, "description": "重装护盾" },
-      { "type": "taunt", "weight": 20, "description": "嘲讽" },
-      { "type": "attackAll", "damage": 7, "target": "frontRow", "weight": 15, "description": "横扫" },
-      { "type": "buff", "buffId": "Thorns", "value": 3, "target": "self", "weight": 10, "description": "电击外壳" }
+    "maxHp": 80,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "minHpScalePerPlayer": 20,
+    "intentPatterns": [
+      { "type": "attack",       "value": 10, "scope": "singleFront", "weight": 2.0, "keywords": ["breakCover"], "description": "💥 重拳 10 [破阵]" },
+      { "type": "defend",       "value": 20, "scope": "self",        "weight": 1.5, "description": "重装护盾 20" },
+      { "type": "buff",         "value": 1,  "scope": "self",        "weight": 1.0, "description": "嘲讽 (获得嘲讽)" },
+      { "type": "attack",       "value": 7,  "scope": "allFront",    "weight": 1.0, "description": "横扫 7 (前排全体)" }
     ]
   },
   {
     "id": "psi_phantom",
     "name": "灵能幻影",
-    "nameEn": "Psi Phantom",
-    "hp": 35,
-    "formation": "back",
-    "intents": [
-      { "type": "debuff", "debuffId": "Vulnerable", "value": 2, "target": "random", "weight": 30, "description": "精神侵蚀" },
-      { "type": "attack", "damage": 10, "target": "lowestHp", "weight": 30, "description": "念力打击" },
-      { "type": "buff", "buffId": "Strength", "value": 1, "target": "allAllies", "weight": 20, "description": "灵能增幅" },
-      { "type": "defend", "block": 6, "weight": 20, "description": "相位闪避" }
+    "maxHp": 35,
+    "preferredRow": "back",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "debuff", "value": 2, "scope": "singleAny",  "weight": 2.0, "description": "精神侵蚀 (易伤2)" },
+      { "type": "attack", "value": 10,"scope": "singleAny",  "weight": 2.0, "description": "念力打击 10" },
+      { "type": "buff",   "value": 1, "scope": "allEnemies", "weight": 1.5, "description": "灵能增幅 (全体力量+1)" },
+      { "type": "defend", "value": 6, "scope": "self",       "weight": 0.5, "description": "相位闪避 6" }
     ]
   },
   {
     "id": "drone_carrier",
     "name": "无人机母舰",
-    "nameEn": "Drone Carrier",
-    "hp": 65,
-    "formation": "back",
-    "intents": [
-      { "type": "summon", "summonId": "attack_drone", "count": 2, "weight": 30, "description": "释放无人机", "cooldown": 3 },
-      { "type": "attack", "damage": 8, "target": "highestAggro", "weight": 25, "description": "导弹发射" },
-      { "type": "buff", "buffId": "Strength", "value": 1, "target": "allAllies", "weight": 25, "description": "战术链接" },
-      { "type": "defend", "block": 10, "weight": 20, "description": "电磁屏障" }
+    "maxHp": 65,
+    "preferredRow": "back",
+    "isElite": true,
+    "isBoss": false,
+    "minHpScalePerPlayer": 15,
+    "intentPatterns": [
+      { "type": "summon", "value": 2,  "scope": "self",      "weight": 2.0, "description": "释放攻击无人机×2" },
+      { "type": "attack", "value": 8,  "scope": "singleAny", "weight": 1.5, "description": "导弹发射 8" },
+      { "type": "buff",   "value": 1,  "scope": "allEnemies","weight": 1.5, "description": "战术链接 (全体力量+1)" },
+      { "type": "defend", "value": 10, "scope": "self",      "weight": 1.0, "description": "电磁屏障 10" }
     ]
   },
   {
     "id": "attack_drone",
     "name": "攻击无人机",
-    "nameEn": "Attack Drone",
-    "hp": 15,
-    "isSummon": true,
-    "formation": "front",
-    "intents": [
-      { "type": "attack", "damage": 7, "target": "highestAggro", "weight": 70, "description": "激光射击" },
-      { "type": "attack", "damage": 5, "target": "backRow", "weight": 30, "description": "骚扰后排" }
+    "maxHp": 15,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "attack", "value": 7, "scope": "singleFront", "weight": 2.0, "description": "激光射击 7" },
+      { "type": "attack", "value": 5, "scope": "singleBack",  "weight": 1.0, "description": "骚扰后排 5" }
     ]
   }
 ]

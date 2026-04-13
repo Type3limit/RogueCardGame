@@ -13,9 +13,7 @@ public enum RoomType
     Shop,          // Buy cards, relics, potions, implants
     Event,         // Random event
     Boss,          // Act boss
-    Treasure,      // Chest with relic
-    ModStation,    // Hack & Salvage modification station
-    DataTerminal,  // Scan upcoming rooms / gain intel
+    Treasure,      // Chest with reward
     Start,
     Victory
 }
@@ -190,9 +188,7 @@ public class MapGenerator
         if (roll < 0.50f) return RoomType.Event;
         if (roll < 0.60f) return RoomType.Shop;
         if (roll < 0.70f) return RoomType.RestSite;
-        if (roll < 0.78f) return RoomType.ModStation;
-        if (roll < 0.85f) return RoomType.DataTerminal;
-        if (roll < 0.92f) return RoomType.Treasure;
+        if (roll < 0.78f) return RoomType.Treasure;
 
         return RoomType.Combat;
     }

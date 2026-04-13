@@ -109,7 +109,7 @@
     "type": "Skill",
     "rarity": "Common",
     "cost": 0,
-    "description": "抽 2 张牌。在弃牌堆中加入一张"故障"。",
+    "description": "抽 2 张牌。在弃牌堆中加入一张「故障」。",
     "effects": [{ "type": "draw", "value": 2 }, { "type": "addToDiscard", "cardId": "glitch" }],
     "upgrade": { "effects": [{ "type": "draw", "value": 3 }, { "type": "addToDiscard", "cardId": "glitch" }] }
   },

@@ -39,12 +39,13 @@ public enum CardClass
 
 /// <summary>
 /// Range type determines how positioning affects damage.
+/// v3 rules: Melee = disabled in back row; Ranged = first card from back row +20%.
 /// </summary>
 public enum CardRange
 {
-    Melee,  // Front row: full damage; Back row: -25% damage
-    Ranged, // Front row: normal; Back row: +15% damage
-    None    // No range modifier (skills, powers)
+    Melee,  // Can only be played from front row (back row: disabled)
+    Ranged, // Back row: first play per turn +20%, subsequent plays normal
+    None    // No range restriction or modifier (skills, powers, position-reactive)
 }
 
 /// <summary>

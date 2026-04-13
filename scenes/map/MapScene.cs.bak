@@ -1,0 +1,286 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using RogueCardGame.Core.Map;
+
+namespace RogueCardGame;
+
+/// <summary>
+/// Map scene - displays the branching path map (Slay the Spire style).
+/// Nodes are clickable to advance the run.
+/// </summary>
+public partial class MapScene : Control
+{
+    private Control _mapContainer = null!;
+    private Label _actLabel = null!;
+    private Label _floorLabel = null!;
+    private Label _goldLabel = null!;
+    private Label _hpLabel = null!;
+    private Label _implantInfo = null!;
+
+    private readonly List<MapNodeUI> _nodeUIs = [];
+
+    private static readonly Dictionary<RoomType, Color> RoomColors = new()
+    {
+        [RoomType.Combat] = new Color(0.8f, 0.3f, 0.3f),
+        [RoomType.EliteCombat] = new Color(1f, 0.6f, 0.1f),
+        [RoomType.Boss] = new Color(1f, 0.1f, 0.1f),
+        [RoomType.RestSite] = new Color(0.3f, 0.8f, 0.4f),
+        [RoomType.Shop] = new Color(1f, 0.85f, 0.2f),
+        [RoomType.Event] = new Color(0.4f, 0.6f, 0.9f),
+        [RoomType.Treasure] = new Color(1f, 0.8f, 0f),
+        [RoomType.Start] = new Color(0.5f, 0.5f, 0.5f),
+        [RoomType.Victory] = new Color(0f, 1f, 0.8f),
+    };
+
+    private static readonly Dictionary<RoomType, string> RoomIcons = new()
+    {
+        [RoomType.Combat] = "⚔",
+        [RoomType.EliteCombat] = "💀",
+        [RoomType.Boss] = "👹",
+        [RoomType.RestSite] = "🔥",
+        [RoomType.Shop] = "💰",
+        [RoomType.Event] = "❓",
+        [RoomType.Treasure] = "🎁",
+        [RoomType.Start] = "▶",
+        [RoomType.Victory] = "⭐",
+    };
+
+    public override void _Ready()
+    {
+        _mapContainer = GetNode<Control>("MapScroll/MapContainer");
+        _actLabel = GetNode<Label>("TopBar/ActLabel");
+        _floorLabel = GetNode<Label>("TopBar/FloorLabel");
+        _goldLabel = GetNode<Label>("TopBar/GoldLabel");
+        _hpLabel = GetNode<Label>("TopBar/HpLabel");
+        _implantInfo = GetNode<Label>("BottomBar/ImplantInfo");
+
+        StyleTopBar();
+        AudioManager.Instance?.PlayBgm(AudioManager.BgmPaths.Map);
+        BuildMap();
+        UpdatePlayerInfo();
+    }
+
+    private void StyleTopBar()
+    {
+        foreach (var child in GetNode("TopBar").GetChildren())
+        {
+            if (child is Label label)
+            {
+                label.AddThemeFontSizeOverride("font_size", 20);
+                label.AddThemeColorOverride("font_color", new Color(0.8f, 0.8f, 0.85f));
+            }
+        }
+        _actLabel.AddThemeFontSizeOverride("font_size", 28);
+        _actLabel.AddThemeColorOverride("font_color", new Color(0f, 0.95f, 0.95f));
+    }
+
+    private void BuildMap()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run?.CurrentMap == null) return;
+
+        var map = run.CurrentMap;
+
+        // Clear existing
+        foreach (var nodeUI in _nodeUIs)
+            nodeUI.Node.QueueFree();
+        _nodeUIs.Clear();
+
+        float mapWidth = 1800f;
+        float mapHeight = 1800f;
+        int totalRows = map.TotalRows;
+
+        for (int i = 0; i < map.Nodes.Count; i++)
+        {
+            var mapNode = map.Nodes[i];
+            int nodesInRow = map.Nodes.Count(n => n.Row == mapNode.Row);
+            int indexInRow = map.Nodes.Where(n => n.Row == mapNode.Row)
+                .ToList().IndexOf(mapNode);
+
+            float x = mapWidth / 2f;
+            if (nodesInRow > 1)
+            {
+                float spacing = mapWidth / (nodesInRow + 1);
+                x = spacing * (indexInRow + 1);
+            }
+            float y = mapHeight - (mapHeight / (totalRows + 1)) * (mapNode.Row + 1);
+
+            var nodeControl = CreateMapNodeControl(mapNode, new Vector2(x - 30, y - 30));
+            _mapContainer.AddChild(nodeControl);
+
+            _nodeUIs.Add(new MapNodeUI
+            {
+                MapNode = mapNode,
+                Node = nodeControl,
+                Position = new Vector2(x, y)
+            });
+        }
+
+        DrawConnections(map);
+
+        _actLabel.Text = $"第{run.CurrentAct}幕";
+        _floorLabel.Text = $"层数: {run.FloorsCleared}";
+    }
+
+    private Control CreateMapNodeControl(MapNode mapNode, Vector2 position)
+    {
+        var roomType = mapNode.Type;
+        bool isAccessible = IsNodeAccessible(mapNode);
+        bool isVisited = mapNode.IsVisited;
+        bool isRevealed = mapNode.IsRevealed || isAccessible;
+
+        var button = new Button();
+        button.Position = position;
+        button.CustomMinimumSize = new Vector2(60, 60);
+        button.Size = new Vector2(60, 60);
+
+        if (isRevealed)
+        {
+            string icon = RoomIcons.GetValueOrDefault(roomType, "?");
+            button.Text = icon;
+            button.AddThemeFontSizeOverride("font_size", 24);
+
+            var color = RoomColors.GetValueOrDefault(roomType, new Color(0.5f, 0.5f, 0.5f));
+            var style = new StyleBoxFlat
+            {
+                BgColor = isVisited ? color * 0.3f : color * 0.15f,
+                BorderColor = isAccessible ? new Color(0f, 1f, 1f) : (isVisited ? color * 0.5f : color * 0.7f),
+                BorderWidthBottom = isAccessible ? 3 : 2,
+                BorderWidthTop = isAccessible ? 3 : 2,
+                BorderWidthLeft = isAccessible ? 3 : 2,
+                BorderWidthRight = isAccessible ? 3 : 2,
+                CornerRadiusBottomLeft = 30,
+                CornerRadiusBottomRight = 30,
+                CornerRadiusTopLeft = 30,
+                CornerRadiusTopRight = 30
+            };
+            button.AddThemeStyleboxOverride("normal", style);
+
+            if (isAccessible && !isVisited)
+            {
+                var hoverStyle = (StyleBoxFlat)style.Duplicate();
+                hoverStyle.BgColor = color * 0.4f;
+                hoverStyle.BorderColor = new Color(0f, 1f, 1f);
+                button.AddThemeStyleboxOverride("hover", hoverStyle);
+                button.Pressed += () => OnMapNodeClicked(mapNode);
+            }
+            else
+            {
+                button.Disabled = true;
+            }
+        }
+        else
+        {
+            button.Text = "?";
+            button.Disabled = true;
+            var hiddenStyle = new StyleBoxFlat
+            {
+                BgColor = new Color(0.1f, 0.1f, 0.15f),
+                BorderColor = new Color(0.2f, 0.2f, 0.25f),
+                BorderWidthBottom = 1, BorderWidthTop = 1,
+                BorderWidthLeft = 1, BorderWidthRight = 1,
+                CornerRadiusBottomLeft = 30, CornerRadiusBottomRight = 30,
+                CornerRadiusTopLeft = 30, CornerRadiusTopRight = 30
+            };
+            button.AddThemeStyleboxOverride("normal", hiddenStyle);
+        }
+
+        return button;
+    }
+
+    private bool IsNodeAccessible(MapNode node)
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run?.CurrentMap == null) return false;
+
+        var map = run.CurrentMap;
+        return map.CanMoveTo(node.Id);
+    }
+
+    private void DrawConnections(ActMap map)
+    {
+        for (int i = 0; i < map.Nodes.Count; i++)
+        {
+            var fromNode = map.Nodes[i];
+            var fromUI = _nodeUIs.FirstOrDefault(n => n.MapNode == fromNode);
+            if (fromUI == null) continue;
+
+            foreach (int toId in fromNode.ConnectedTo)
+            {
+                var toNode = map.GetNode(toId);
+                if (toNode == null) continue;
+                var toUI = _nodeUIs.FirstOrDefault(n => n.MapNode == toNode);
+                if (toUI == null) continue;
+
+                var line = new Line2D();
+                line.AddPoint(fromUI.Position);
+                line.AddPoint(toUI.Position);
+                line.Width = 2f;
+                line.DefaultColor = fromNode.IsVisited
+                    ? new Color(0f, 0.7f, 0.7f, 0.5f)
+                    : new Color(0.3f, 0.3f, 0.4f, 0.6f);
+
+                _mapContainer.AddChild(line);
+                _mapContainer.MoveChild(line, 0);
+            }
+        }
+    }
+
+    private void OnMapNodeClicked(MapNode node)
+    {
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.MapNodeSelect);
+
+        var run = GameManager.Instance.CurrentRun;
+        if (run?.CurrentMap == null) return;
+
+        // Use the ActMap.MoveTo which handles visited/revealed state
+        run.CurrentMap.MoveTo(node.Id);
+
+        switch (node.Type)
+        {
+            case RoomType.Combat:
+            case RoomType.EliteCombat:
+            case RoomType.Boss:
+                SceneManager.Instance.ChangeScene(SceneManager.Scenes.Combat);
+                break;
+            case RoomType.RestSite:
+                SceneManager.Instance.ChangeScene(SceneManager.Scenes.Rest);
+                break;
+            case RoomType.Shop:
+                SceneManager.Instance.ChangeScene(SceneManager.Scenes.Shop);
+                break;
+            case RoomType.Event:
+                SceneManager.Instance.ChangeScene(SceneManager.Scenes.Event);
+                break;
+            case RoomType.Treasure:
+                SceneManager.Instance.ChangeScene(SceneManager.Scenes.Reward);
+                break;
+            default:
+                GD.Print($"Unhandled room type: {node.Type}");
+                break;
+        }
+    }
+
+    private void UpdatePlayerInfo()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        _goldLabel.Text = $"💰 {run.Gold}";
+        _hpLabel.Text = $"❤ {run.Player.CurrentHp}/{run.Player.MaxHp}";
+
+        var implants = run.Implants.GetAllEquipped();
+        _implantInfo.Text = implants.Count > 0
+            ? $"植入体: {string.Join(", ", implants.Select(i => i.Data.Name))}"
+            : "植入体: 无";
+    }
+
+    private class MapNodeUI
+    {
+        public MapNode MapNode = null!;
+        public Control Node = null!;
+        public Vector2 Position;
+    }
+}

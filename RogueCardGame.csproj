@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Godot.NET.Sdk/4.6.2">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>RogueCardGame</RootNamespace>
@@ -7,15 +7,4 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>12</LangVersion>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="GodotSharp" Version="4.3.0" />
-  </ItemGroup>
-
-  <!-- 
-    NOTE: When building inside Godot editor, switch SDK back to:
-    <Project Sdk="Godot.NET.Sdk/4.3.0">
-    and remove the GodotSharp PackageReference.
-    The standard SDK is used here for standalone C# compilation.
-  -->
 </Project>

@@ -10,7 +10,7 @@ namespace RogueCardGame.Core.Implants;
 public enum ImplantSlot
 {
     Neural,   // Affects card draw, energy, hand mechanics
-    Somatic,  // Affects HP, block, physical combat
+    Somatic,  // Affects body: HP, block, physical stats
     Core      // Fundamentally changes class mechanic
 }
 
@@ -72,7 +72,6 @@ public class ImplantManager
     private readonly Dictionary<ImplantSlot, Implant?> _slots = new()
     {
         [ImplantSlot.Neural] = null,
-        [ImplantSlot.Somatic] = null,
         [ImplantSlot.Core] = null,
     };
 

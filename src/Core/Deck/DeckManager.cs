@@ -165,6 +165,15 @@ public class DeckManager
     }
 
     /// <summary>
+    /// Add a card directly to the discard pile (e.g., curse/status cards added mid-combat).
+    /// </summary>
+    public void AddToDiscard(Card card)
+    {
+        _discardPile.Add(card);
+        OnCardDiscarded?.Invoke(card);
+    }
+
+    /// <summary>
     /// Add a card to the top of the draw pile.
     /// </summary>
     public void AddToDrawPileTop(Card card)

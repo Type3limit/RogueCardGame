@@ -1,0 +1,25 @@
+{
+  "id": "vanguard",
+  "name": "先锋",
+  "nameEn": "Vanguard",
+  "description": "重装战士，擅长前排近战与护甲叠加。超载机制提供爆发输出。",
+  "maxHp": 85,
+  "startRow": "front",
+  "baseEnergy": 3,
+  "drawPerTurn": 5,
+  "classResource": {
+    "id": "overcharge",
+    "statusType": "Overcharge",
+    "displayName": "超载",
+    "displayNameEn": "Overcharge",
+    "startValue": 0
+  },
+  "starterDeckCardIds": [
+    "vanguard_strike", "vanguard_strike", "vanguard_strike", "vanguard_strike",
+    "vanguard_defend", "vanguard_defend", "vanguard_defend", "vanguard_defend",
+    "vanguard_charge"
+  ],
+  "unlockCondition": "default",
+  "color": "#E63946",
+  "iconPath": "res://resources/textures/characters/vanguard_icon.png"
+}

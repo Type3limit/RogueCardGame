@@ -1,3 +1,5 @@
+using RogueCardGame.Core;
+
 namespace RogueCardGame.Core.Combat;
 
 /// <summary>
@@ -8,14 +10,9 @@ public class AggroSystem
 {
     private readonly Dictionary<int, float> _aggroValues = new();
 
-    /// <summary>Aggro generated per point of damage dealt.</summary>
-    public const float AggroPerDamage = 1.0f;
-
-    /// <summary>Aggro generated per point of healing done.</summary>
-    public const float AggroPerHealing = 0.5f;
-
-    /// <summary>Aggro generated per buff applied.</summary>
-    public const float AggroPerBuff = 2.0f;
+    public static float AggroPerDamage => BalanceConfig.Current.Aggro.AggroPerDamage;
+    public static float AggroPerHealing => BalanceConfig.Current.Aggro.AggroPerHealing;
+    public static float AggroPerBuff => BalanceConfig.Current.Aggro.AggroPerBuff;
 
     public float GetAggro(int combatantId)
     {
@@ -81,11 +78,12 @@ public class AggroSystem
     /// <summary>
     /// Decay all aggro values slightly each turn to prevent permanent lock-on.
     /// </summary>
-    public void DecayAggro(float decayRate = 0.9f)
+    public void DecayAggro(float? decayRate = null)
     {
+        float rate = decayRate ?? BalanceConfig.Current.Aggro.AggroDecayRate;
         foreach (var key in _aggroValues.Keys.ToList())
         {
-            _aggroValues[key] *= decayRate;
+            _aggroValues[key] *= rate;
         }
     }
 

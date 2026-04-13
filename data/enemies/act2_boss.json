@@ -2,66 +2,59 @@
   {
     "id": "data_overlord",
     "name": "数据霸主",
-    "nameEn": "Data Overlord",
+    "maxHp": 350,
+    "preferredRow": "back",
+    "isElite": false,
     "isBoss": true,
-    "hp": 350,
-    "formation": "back",
-    "description": "第二幕Boss。控制着整个数据层的AI意识体，能实时改写战场规则。",
+    "minHpScalePerPlayer": 70,
+    "intentPatterns": [
+      { "type": "attack", "value": 12, "scope": "singleAny", "weight": 1.0, "description": "数据射线 12" }
+    ],
     "phases": [
       {
-        "name": "phase1",
         "hpThreshold": 1.0,
-        "description": "数据操控：改变环境效果，施加 debuff",
-        "intents": [
-          { "type": "attack", "damage": 14, "target": "highestAggro", "weight": 25, "description": "数据射线" },
-          { "type": "debuff", "debuffId": "Weak", "value": 2, "target": "allPlayers", "weight": 20, "description": "系统降权" },
-          { "type": "attackAll", "damage": 8, "target": "all", "weight": 20, "description": "数据洪流" },
-          { "type": "defend", "block": 18, "weight": 15, "description": "防火墙" },
-          { "type": "changeEnvironment", "weight": 20, "description": "战场改写", "cooldown": 4 }
+        "entryEffect": "数据霸主展开数据操控",
+        "intentPatterns": [
+          { "type": "attack",  "value": 14, "scope": "singleAny",  "weight": 2.0, "description": "数据射线 14" },
+          { "type": "debuff",  "value": 2,  "scope": "all",        "weight": 1.5, "description": "系统降权 (全体虚弱2)" },
+          { "type": "attack",  "value": 8,  "scope": "all",        "weight": 1.5, "description": "数据洪流 8 (全体)" },
+          { "type": "defend",  "value": 18, "scope": "self",       "weight": 1.0, "description": "防火墙 18" },
+          { "type": "buff",    "value": 2,  "scope": "self",       "weight": 1.0, "description": "战场改写 (力量+2)" }
         ]
       },
       {
-        "name": "phase2",
         "hpThreshold": 0.6,
-        "description": "分裂：召唤数据分身",
-        "intents": [
-          { "type": "attack", "damage": 18, "target": "highestAggro", "weight": 30, "description": "强化数据射线" },
-          { "type": "summon", "summonId": "data_clone", "count": 1, "weight": 20, "description": "数据分身", "cooldown": 4 },
-          { "type": "attackAll", "damage": 12, "target": "all", "weight": 25, "description": "数据风暴" },
-          { "type": "debuff", "debuffId": "Vulnerable", "value": 2, "target": "random", "weight": 25, "description": "漏洞扫描" }
+        "entryEffect": "⚠️ 数据霸主启动分裂协议——召唤数据分身！",
+        "intentPatterns": [
+          { "type": "attack",  "value": 18, "scope": "singleAny",  "weight": 2.0, "description": "强化数据射线 18" },
+          { "type": "summon",  "value": 1,  "scope": "self",       "weight": 1.5, "description": "数据分身" },
+          { "type": "attack",  "value": 12, "scope": "all",        "weight": 1.5, "description": "数据风暴 12 (全体)" },
+          { "type": "debuff",  "value": 2,  "scope": "singleAny",  "weight": 1.0, "description": "漏洞扫描 (易伤2)" }
         ]
       },
       {
-        "name": "phase3",
         "hpThreshold": 0.3,
-        "description": "暴走：攻击极大增强",
-        "intents": [
-          { "type": "attack", "damage": 25, "target": "highestAggro", "weight": 35, "description": "超频射线" },
-          { "type": "attackAll", "damage": 15, "target": "all", "weight": 30, "description": "系统崩溃" },
-          { "type": "buff", "buffId": "Strength", "value": 3, "target": "self", "weight": 20, "description": "超载" },
-          { "type": "debuff", "debuffId": "Weak", "value": 1, "target": "allPlayers", "weight": 15, "description": "EMP" }
+        "entryEffect": "⚠️ 数据霸主系统崩溃——进入暴走模式！",
+        "intentPatterns": [
+          { "type": "attack",  "value": 25, "scope": "singleAny",  "weight": 2.0, "description": "超频射线 25" },
+          { "type": "attack",  "value": 15, "scope": "all",        "weight": 2.0, "description": "系统崩溃 15 (全体)" },
+          { "type": "buff",    "value": 3,  "scope": "self",       "weight": 1.0, "description": "超载 (力量+3)" },
+          { "type": "debuff",  "value": 1,  "scope": "all",        "weight": 1.0, "description": "EMP (全体虚弱1)" }
         ]
       }
-    ],
-    "adaptiveWeight": 0.35,
-    "specialAbilities": [
-      { "id": "firewall", "trigger": "everyNTurns", "interval": 3, "description": "清除入侵进度" },
-      { "id": "analyze", "trigger": "everyNTurns", "interval": 2, "description": "实时适应玩家策略" },
-      { "id": "environmentShift", "trigger": "onPhaseChange", "description": "进入新阶段时随机更换战场环境" }
-    ],
-    "loot": { "gold": { "min": 100, "max": 150 }, "relicDrop": true, "implantChance": 0.7 }
+    ]
   },
   {
     "id": "data_clone",
     "name": "数据分身",
-    "nameEn": "Data Clone",
-    "hp": 50,
-    "isSummon": true,
-    "formation": "front",
-    "intents": [
-      { "type": "attack", "damage": 10, "target": "random", "weight": 50, "description": "镜像攻击" },
-      { "type": "heal", "value": 15, "target": "boss", "weight": 30, "description": "数据回流" },
-      { "type": "defend", "block": 8, "weight": 20, "description": "镜像护盾" }
+    "maxHp": 50,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "attack",  "value": 10, "scope": "singleAny",  "weight": 2.0, "description": "镜像攻击 10" },
+      { "type": "heal",    "value": 15, "scope": "allEnemies", "weight": 1.5, "description": "数据回流 (全体恢复15)" },
+      { "type": "defend",  "value": 8,  "scope": "self",       "weight": 1.0, "description": "镜像护盾 8" }
     ]
   }
 ]

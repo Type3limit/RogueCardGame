@@ -67,9 +67,6 @@ public class CardDatabase
     public List<CardData> GetCardsByRarity(CardRarity rarity) =>
         _cards.Values.Where(c => c.Rarity == rarity).ToList();
 
-    public List<CardData> GetLinkCards() =>
-        _cards.Values.Where(c => c.IsLink).ToList();
-
     /// <summary>
     /// Get the starter deck for a given class.
     /// </summary>

@@ -28,6 +28,7 @@ public sealed class EnemyIntent
     public int HitCount { get; init; } = 1;
     public TargetScope Scope { get; init; } = TargetScope.SingleFront;
     public string? Description { get; init; }
+    public List<string> Keywords { get; init; } = [];
 }
 
 /// <summary>
@@ -46,6 +47,16 @@ public enum TargetScope
 }
 
 /// <summary>
+/// A behavior phase for multi-phase enemies. Activated at HP thresholds.
+/// </summary>
+public sealed class EnemyPhase
+{
+    public float HpThreshold { get; init; }  // 0.0–1.0, activates at or below this HP fraction
+    public List<EnemyIntentPattern> IntentPatterns { get; init; } = [];
+    public string? EntryEffect { get; init; } // Optional description of phase-change ability
+}
+
+/// <summary>
 /// Data definition for an enemy type, loaded from JSON.
 /// </summary>
 public sealed class EnemyData
@@ -55,12 +66,12 @@ public sealed class EnemyData
     public required int MaxHp { get; init; }
     public required FormationRow PreferredRow { get; init; }
     public required List<EnemyIntentPattern> IntentPatterns { get; init; }
+    /// <summary>Optional phase list for multi-phase enemies (boss, elite).</summary>
+    public List<EnemyPhase> Phases { get; init; } = [];
     public int MinHpScalePerPlayer { get; init; } = 0;
     public string? ArtPath { get; init; }
     public bool IsElite { get; init; }
     public bool IsBoss { get; init; }
-    public bool IsHackable { get; init; } = true;
-    public int HackThreshold { get; init; } = 10;
 }
 
 /// <summary>
@@ -74,6 +85,11 @@ public sealed class EnemyIntentPattern
     public TargetScope Scope { get; init; } = TargetScope.SingleFront;
     public float Weight { get; init; } = 1.0f;
     public string? Description { get; init; }
+    /// <summary>
+    /// Position keywords that modify how this intent works.
+    /// Supported: "lock" (apply Rooted to target), "breakCover" (splash to back row).
+    /// </summary>
+    public List<string> Keywords { get; init; } = [];
 }
 
 /// <summary>
@@ -83,8 +99,7 @@ public class Enemy : Combatant
 {
     public EnemyData Data { get; }
     public EnemyIntent? CurrentIntent { get; set; }
-    public bool IsHacked { get; set; }
-    public int HackedTurnsLeft { get; set; }
+    private int _currentPhaseIndex = -1; // -1 = using base patterns
 
     public Enemy(EnemyData data, int playerCount = 1)
         : base(data.Name, data.MaxHp + data.MinHpScalePerPlayer * Math.Max(0, playerCount - 1))
@@ -93,39 +108,49 @@ public class Enemy : Combatant
     }
 
     /// <summary>
-    /// Check if the enemy can be hacked (not a boss, hackable flag, etc.).
+    /// Get the active intent patterns based on current HP and phase thresholds.
     /// </summary>
-    public bool CanBeHacked()
+    public List<EnemyIntentPattern> GetActivePatterns()
     {
-        return Data.IsHackable && !Data.IsBoss && !IsHacked;
+        if (Data.Phases.Count == 0)
+            return Data.IntentPatterns;
+
+        float hpFraction = (float)CurrentHp / MaxHp;
+        // Find highest priority phase (lowest threshold that current HP is at or below)
+        for (int i = Data.Phases.Count - 1; i >= 0; i--)
+        {
+            if (hpFraction <= Data.Phases[i].HpThreshold)
+                return Data.Phases[i].IntentPatterns;
+        }
+        return Data.IntentPatterns;
     }
 
     /// <summary>
-    /// Try to hack this enemy. Returns true if hack threshold reached.
+    /// Check if a phase transition just occurred; fire entry effect if so.
+    /// Returns the phase entry description if a new phase was entered, else null.
     /// </summary>
-    public bool TryHack()
+    public string? CheckPhaseTransition()
     {
-        if (!CanBeHacked()) return false;
+        if (Data.Phases.Count == 0) return null;
 
-        int progress = StatusEffects.GetStacks(StatusType.HackProgress);
-        if (progress >= Data.HackThreshold)
+        float hpFraction = (float)CurrentHp / MaxHp;
+        int newPhaseIndex = -1;
+        for (int i = Data.Phases.Count - 1; i >= 0; i--)
         {
-            StatusEffects.Remove(StatusType.HackProgress);
-            IsHacked = true;
-            HackedTurnsLeft = 2;
-            return true;
+            if (hpFraction <= Data.Phases[i].HpThreshold)
+            {
+                newPhaseIndex = i;
+                break;
+            }
         }
-        return false;
-    }
 
-    public void TickHack()
-    {
-        if (!IsHacked) return;
-        HackedTurnsLeft--;
-        if (HackedTurnsLeft <= 0)
+        if (newPhaseIndex != _currentPhaseIndex)
         {
-            IsHacked = false;
-            StatusEffects.Apply(StatusType.SystemChaos, 2, 3);
+            _currentPhaseIndex = newPhaseIndex;
+            return newPhaseIndex >= 0
+                ? Data.Phases[newPhaseIndex].EntryEffect
+                : null;
         }
+        return null;
     }
 }

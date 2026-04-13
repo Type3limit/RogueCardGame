@@ -1,0 +1,224 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using RogueCardGame.Core;
+using RogueCardGame.Core.Cards;
+using RogueCardGame.Core.Map;
+
+namespace RogueCardGame;
+
+public partial class RewardScene : Control
+{
+    private Label _title = null!;
+    private VBoxContainer _rewardList = null!;
+    private HBoxContainer _cardRewardArea = null!;
+    private Button _skipBtn = null!;
+
+    private List<CardData> _cardRewards = [];
+
+    public override void _Ready()
+    {
+        _title = GetNode<Label>("Title");
+        _rewardList = GetNode<VBoxContainer>("RewardList");
+        _cardRewardArea = GetNode<HBoxContainer>("CardRewardArea");
+        _skipBtn = GetNode<Button>("SkipBtn");
+
+        _skipBtn.Pressed += OnSkipPressed;
+
+        StyleUI();
+        BuildRewards();
+
+        // Reward phase uses the Map BGM
+        AudioManager.Instance?.PlayBgm(AudioManager.BgmPaths.Map);
+    }
+
+    private void StyleUI()
+    {
+        _title.AddThemeFontSizeOverride("font_size", 36);
+        _title.AddThemeColorOverride("font_color", new Color(1f, 0.8f, 0f));
+
+        var skipStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.15f, 0.15f, 0.2f),
+            BorderColor = new Color(0f, 0.95f, 0.95f),
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
+            CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6
+        };
+        _skipBtn.AddThemeStyleboxOverride("normal", skipStyle);
+        _skipBtn.AddThemeColorOverride("font_color", new Color(0f, 0.95f, 0.95f));
+        _skipBtn.AddThemeFontSizeOverride("font_size", 20);
+    }
+
+    private void BuildRewards()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        var node = run.CurrentMap?.CurrentNode;
+        bool isElite = node?.Type == RoomType.EliteCombat;
+        bool isBoss = node?.Type == RoomType.Boss;
+
+        var gb = BalanceConfig.Current.GlobalBalance;
+        int goldReward = isBoss ? gb.BossGoldReward
+            : isElite ? gb.EliteGoldReward
+            : run.Random.Next(gb.NormalGoldRewardMin, gb.NormalGoldRewardMax);
+        AddRewardItem($"💰 {goldReward} 金币", new Color(1f, 0.85f, 0.2f), true);
+
+        // Potion drop
+        if (run.Random.NextDouble() < 0.4 && run.Potions.HasEmptySlot())
+        {
+            var potionPool = run.PotionDb.GetAll();
+            if (potionPool.Count > 0)
+            {
+                var potion = potionPool[run.Random.Next(potionPool.Count)];
+                AddRewardItem($"🧪 {potion.Name}", new Color(0.3f, 0.8f, 0.4f), false, () =>
+                {
+                    run.Potions.TryAddPotion(potion);
+                    AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+                });
+            }
+        }
+
+        // Card reward choices (3 cards)
+        GenerateCardRewards(run);
+    }
+
+    private void AddRewardItem(string text, Color color, bool autoCollect, Action? onCollect = null)
+    {
+        var btn = new Button();
+        btn.Text = text;
+        btn.CustomMinimumSize = new Vector2(0, 50);
+        btn.AddThemeFontSizeOverride("font_size", 20);
+        btn.AddThemeColorOverride("font_color", color);
+
+        var style = new StyleBoxFlat
+        {
+            BgColor = new Color(0.1f, 0.1f, 0.15f),
+            BorderColor = color * 0.6f,
+            BorderWidthBottom = 1, BorderWidthTop = 1,
+            BorderWidthLeft = 1, BorderWidthRight = 1,
+            CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
+            CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6,
+            ContentMarginLeft = 15, ContentMarginRight = 15,
+        };
+        btn.AddThemeStyleboxOverride("normal", style);
+
+        if (autoCollect)
+        {
+            btn.Disabled = true;
+            btn.Text += " (已获得)";
+        }
+        else if (onCollect != null)
+        {
+            btn.Pressed += () =>
+            {
+                onCollect();
+                btn.Disabled = true;
+                btn.Text += " (已获得)";
+            };
+        }
+
+        _rewardList.AddChild(btn);
+    }
+
+    private void GenerateCardRewards(Core.Run.RunState run)
+    {
+        var playerClass = run.Player.Class;
+        var pool = run.CardDb.GetCardsByClass(playerClass)
+            .Where(c => c.Rarity != CardRarity.Starter)
+            .Concat(run.CardDb.GetCardsByClass(CardClass.Colorless)
+                .Where(c => c.Rarity != CardRarity.Starter))
+            .ToList();
+
+        run.Random.Shuffle(pool);
+        _cardRewards = pool.Take(3).ToList();
+
+        foreach (var cardData in _cardRewards)
+        {
+            var btn = CreateCardRewardButton(cardData);
+            _cardRewardArea.AddChild(btn);
+        }
+    }
+
+    private Button CreateCardRewardButton(CardData cardData)
+    {
+        var btn = new Button();
+        btn.CustomMinimumSize = new Vector2(180, 250);
+
+        string typeIcon = cardData.Type switch
+        {
+            CardType.Attack => "⚔",
+            CardType.Skill => "🛡",
+            CardType.Power => "⚡",
+            _ => "?"
+        };
+
+        string rarityText = cardData.Rarity switch
+        {
+            CardRarity.Rare => "[稀有]",
+            CardRarity.Uncommon => "[罕见]",
+            _ => "[普通]"
+        };
+
+        btn.Text = $"{typeIcon} [{cardData.Cost}]\n{cardData.Name}\n{rarityText}\n\n{cardData.Description}";
+
+        var color = cardData.Type switch
+        {
+            CardType.Attack => new Color(0.8f, 0.2f, 0.2f),
+            CardType.Skill => new Color(0.2f, 0.5f, 0.8f),
+            CardType.Power => new Color(0.7f, 0.5f, 0.1f),
+            _ => new Color(0.3f, 0.3f, 0.3f)
+        };
+
+        var style = new StyleBoxFlat
+        {
+            BgColor = color * 0.2f,
+            BorderColor = color * 0.8f,
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 10, ContentMarginRight = 10,
+            ContentMarginTop = 10, ContentMarginBottom = 10
+        };
+        btn.AddThemeStyleboxOverride("normal", style);
+
+        var hoverStyle = (StyleBoxFlat)style.Duplicate();
+        hoverStyle.BgColor = color * 0.4f;
+        hoverStyle.BorderColor = new Color(1f, 1f, 1f);
+        btn.AddThemeStyleboxOverride("hover", hoverStyle);
+
+        btn.AddThemeFontSizeOverride("font_size", 14);
+        btn.AddThemeColorOverride("font_color", Colors.White);
+
+        btn.Pressed += () =>
+        {
+            var run = GameManager.Instance.CurrentRun;
+            if (run == null) return;
+
+            AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+            run.AddCardToDeck(cardData);
+
+            // Disable all card reward buttons
+            foreach (var child in _cardRewardArea.GetChildren())
+                if (child is Button b) b.Disabled = true;
+
+            btn.Text += "\n[已选择]";
+
+            // Auto return to map after a brief delay
+            var timer = GetTree().CreateTimer(0.8);
+            timer.Timeout += () => SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+        };
+
+        return btn;
+    }
+
+    private void OnSkipPressed()
+    {
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+        SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+    }
+}

@@ -1,0 +1,148 @@
+using Godot;
+using System;
+using System.Linq;
+using RogueCardGame.Core.Cards;
+
+namespace RogueCardGame;
+
+public partial class RestScene : Control
+{
+    private Label _hpLabel = null!;
+    private Button _restBtn = null!;
+    private Button _upgradeBtn = null!;
+    private VBoxContainer _optionsContainer = null!;
+    private VBoxContainer _cardListContainer = null!;
+    private Label _title = null!;
+
+    public override void _Ready()
+    {
+        _title = GetNode<Label>("Title");
+        _hpLabel = GetNode<Label>("HpLabel");
+        _restBtn = GetNode<Button>("OptionsContainer/RestBtn");
+        _upgradeBtn = GetNode<Button>("OptionsContainer/UpgradeBtn");
+        _optionsContainer = GetNode<VBoxContainer>("OptionsContainer");
+        _cardListContainer = GetNode<VBoxContainer>("CardListContainer");
+
+        _restBtn.Pressed += OnRestPressed;
+        _upgradeBtn.Pressed += OnUpgradePressed;
+
+        StyleUI();
+        AudioManager.Instance?.PlayBgm(AudioManager.BgmPaths.Event);
+        UpdateHpDisplay();
+    }
+
+    private void StyleUI()
+    {
+        _title.AddThemeFontSizeOverride("font_size", 36);
+        _title.AddThemeColorOverride("font_color", new Color(1f, 0.6f, 0.2f));
+
+        _hpLabel.AddThemeFontSizeOverride("font_size", 24);
+        _hpLabel.AddThemeColorOverride("font_color", new Color(0.8f, 0.2f, 0.2f));
+
+        foreach (var child in _optionsContainer.GetChildren())
+        {
+            if (child is Button btn)
+            {
+                var style = new StyleBoxFlat
+                {
+                    BgColor = new Color(0.12f, 0.12f, 0.18f),
+                    BorderColor = new Color(0.3f, 0.3f, 0.5f),
+                    BorderWidthBottom = 2, BorderWidthTop = 2,
+                    BorderWidthLeft = 2, BorderWidthRight = 2,
+                    CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+                    CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+                    ContentMarginLeft = 20, ContentMarginRight = 20,
+                    ContentMarginTop = 10, ContentMarginBottom = 10
+                };
+                btn.AddThemeStyleboxOverride("normal", style);
+                btn.AddThemeFontSizeOverride("font_size", 20);
+                btn.AddThemeColorOverride("font_color", Colors.White);
+            }
+        }
+    }
+
+    private void UpdateHpDisplay()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        int healAmount = (int)(run.Player.MaxHp * 0.3f);
+        _hpLabel.Text = $"HP: {run.Player.CurrentHp}/{run.Player.MaxHp}";
+        _restBtn.Text = $"休息 - 恢复 {healAmount} 生命值";
+
+        int upgradableCards = run.MasterDeck.Count(c => !c.IsUpgraded);
+        _upgradeBtn.Text = $"升级 - 升级一张卡牌 ({upgradableCards}张可升级)";
+        _upgradeBtn.Disabled = upgradableCards == 0;
+    }
+
+    private void OnRestPressed()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+        run.Rest();
+        GoToMap();
+    }
+
+    private void OnUpgradePressed()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+
+        // Show card list for upgrade selection
+        _optionsContainer.Visible = false;
+        _cardListContainer.Visible = true;
+
+        foreach (var child in _cardListContainer.GetChildren())
+            child.QueueFree();
+
+        var upgradable = run.MasterDeck.Where(c => !c.IsUpgraded).ToList();
+
+        foreach (var card in upgradable)
+        {
+            var btn = new Button();
+            btn.Text = $"{card.DisplayName} (费用:{card.CurrentCost}) - {card.Data.Type}";
+            btn.CustomMinimumSize = new Vector2(0, 40);
+            btn.AddThemeFontSizeOverride("font_size", 16);
+
+            var style = new StyleBoxFlat
+            {
+                BgColor = new Color(0.12f, 0.12f, 0.18f),
+                BorderColor = new Color(0.4f, 0.4f, 0.6f),
+                BorderWidthBottom = 1, BorderWidthTop = 1,
+                BorderWidthLeft = 1, BorderWidthRight = 1,
+                CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4,
+                CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4,
+            };
+            btn.AddThemeStyleboxOverride("normal", style);
+            btn.AddThemeColorOverride("font_color", Colors.White);
+
+            btn.Pressed += () =>
+            {
+                card.Upgrade();
+                AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+                GoToMap();
+            };
+
+            _cardListContainer.AddChild(btn);
+        }
+
+        // Cancel button
+        var cancelBtn = new Button { Text = "取消" };
+        cancelBtn.AddThemeFontSizeOverride("font_size", 18);
+        cancelBtn.Pressed += () =>
+        {
+            _cardListContainer.Visible = false;
+            _optionsContainer.Visible = true;
+        };
+        _cardListContainer.AddChild(cancelBtn);
+    }
+
+    private void GoToMap()
+    {
+        SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+    }
+}

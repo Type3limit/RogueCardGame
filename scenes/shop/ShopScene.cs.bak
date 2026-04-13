@@ -1,0 +1,194 @@
+using Godot;
+using System;
+using System.Linq;
+using RogueCardGame.Core.Cards;
+using RogueCardGame.Core.Shop;
+
+namespace RogueCardGame;
+
+public partial class ShopScene : Control
+{
+    private Label _goldLabel = null!;
+    private GridContainer _itemGrid = null!;
+    private Button _leaveBtn = null!;
+    private Label _title = null!;
+
+    private ShopManager? _shop;
+
+    public override void _Ready()
+    {
+        _goldLabel = GetNode<Label>("GoldLabel");
+        _itemGrid = GetNode<GridContainer>("ItemGrid");
+        _leaveBtn = GetNode<Button>("LeaveBtn");
+        _title = GetNode<Label>("Title");
+
+        _leaveBtn.Pressed += OnLeavePressed;
+
+        StyleUI();
+        AudioManager.Instance?.PlayBgm(AudioManager.BgmPaths.Shop);
+        GenerateShop();
+    }
+
+    private void StyleUI()
+    {
+        var cyan = new Color(0f, 0.95f, 0.95f);
+        _title.AddThemeFontSizeOverride("font_size", 36);
+        _title.AddThemeColorOverride("font_color", new Color(1f, 0.85f, 0.2f));
+
+        _goldLabel.AddThemeFontSizeOverride("font_size", 24);
+        _goldLabel.AddThemeColorOverride("font_color", new Color(1f, 0.85f, 0.2f));
+
+        var leaveStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.15f, 0.15f, 0.2f),
+            BorderColor = cyan,
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
+            CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6
+        };
+        _leaveBtn.AddThemeStyleboxOverride("normal", leaveStyle);
+        _leaveBtn.AddThemeColorOverride("font_color", cyan);
+        _leaveBtn.AddThemeFontSizeOverride("font_size", 22);
+    }
+
+    private void GenerateShop()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        _shop = new ShopManager(run.Random);
+        _shop.GenerateShop(run.CardDb, run.PotionDb, run.ImplantDb, run.Player.Class, run.CurrentAct);
+
+        BuildItems();
+        UpdateGold();
+    }
+
+    private void BuildItems()
+    {
+        foreach (var child in _itemGrid.GetChildren())
+            child.QueueFree();
+
+        if (_shop == null) return;
+
+        foreach (var item in _shop.Items)
+        {
+            var btn = CreateItemButton(item);
+            _itemGrid.AddChild(btn);
+        }
+    }
+
+    private Button CreateItemButton(ShopItem item)
+    {
+        var btn = new Button();
+        btn.CustomMinimumSize = new Vector2(200, 120);
+
+        var run = GameManager.Instance.CurrentRun;
+        bool canAfford = run != null && run.Gold >= item.Price;
+        bool isSold = item.IsSold;
+
+        string typeIcon = item.Type switch
+        {
+            ShopItemType.Card => "🃏",
+            ShopItemType.Potion => "🧪",
+            ShopItemType.Implant => "⚙",
+            ShopItemType.CardRemoval => "❌",
+            _ => "?"
+        };
+
+        btn.Text = isSold ? $"{item.Name}\n[已售出]"
+            : $"{typeIcon} {item.Name}\n💰 {item.Price}";
+
+        Color bgColor;
+        Color borderColor;
+
+        if (isSold)
+        {
+            bgColor = new Color(0.1f, 0.1f, 0.1f);
+            borderColor = new Color(0.2f, 0.2f, 0.2f);
+        }
+        else if (item.Type == ShopItemType.Card)
+        {
+            var rarity = item.CardData?.Rarity ?? CardRarity.Common;
+            bgColor = rarity switch
+            {
+                CardRarity.Rare => new Color(0.3f, 0.2f, 0.05f),
+                CardRarity.Uncommon => new Color(0.1f, 0.2f, 0.1f),
+                _ => new Color(0.12f, 0.12f, 0.18f)
+            };
+            borderColor = canAfford ? new Color(0.6f, 0.6f, 0.7f) : new Color(0.3f, 0.3f, 0.35f);
+        }
+        else
+        {
+            bgColor = new Color(0.12f, 0.12f, 0.18f);
+            borderColor = canAfford ? new Color(0.6f, 0.6f, 0.7f) : new Color(0.3f, 0.3f, 0.35f);
+        }
+
+        var style = new StyleBoxFlat
+        {
+            BgColor = bgColor,
+            BorderColor = borderColor,
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 8, ContentMarginRight = 8,
+            ContentMarginTop = 8, ContentMarginBottom = 8
+        };
+        btn.AddThemeStyleboxOverride("normal", style);
+        btn.AddThemeFontSizeOverride("font_size", 16);
+        btn.AddThemeColorOverride("font_color", canAfford && !isSold ? Colors.White : new Color(0.5f, 0.5f, 0.5f));
+        btn.Disabled = isSold || !canAfford;
+
+        if (!isSold && canAfford)
+            btn.Pressed += () => OnItemClicked(item);
+
+        return btn;
+    }
+
+    private void OnItemClicked(ShopItem item)
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null || item.IsSold) return;
+        if (!run.TrySpendGold(item.Price)) return;
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+
+        switch (item.Type)
+        {
+            case ShopItemType.Card when item.CardData != null:
+                run.AddCardToDeck(item.CardData);
+                break;
+            case ShopItemType.Potion when item.PotionData != null:
+                run.Potions.TryAddPotion(item.PotionData);
+                break;
+            case ShopItemType.Implant when item.ImplantData != null:
+                run.Implants.Equip(item.ImplantData);
+                break;
+            case ShopItemType.CardRemoval:
+                // TODO: Open card selection for removal
+                if (run.MasterDeck.Count > 0)
+                {
+                    var card = run.MasterDeck[^1];
+                    run.RemoveCardFromDeck(card);
+                }
+                break;
+        }
+
+        item.IsSold = true;
+        BuildItems();
+        UpdateGold();
+    }
+
+    private void UpdateGold()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        _goldLabel.Text = $"金币: {run?.Gold ?? 0}";
+    }
+
+    private void OnLeavePressed()
+    {
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+        SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+    }
+}

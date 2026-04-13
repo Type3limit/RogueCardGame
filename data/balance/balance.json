@@ -1,43 +1,51 @@
 {
-  "multiplayerScaling": {
-    "2players": {
-      "enemyHpMultiplier": 1.6,
-      "bossHpMultiplier": 1.8,
-      "enemyCountBonus": 0,
-      "goldPerPlayerMultiplier": 0.8
-    },
-    "3players": {
-      "enemyHpMultiplier": 2.2,
-      "bossHpMultiplier": 2.5,
-      "enemyCountBonus": 1,
-      "goldPerPlayerMultiplier": 0.7
-    },
-    "4players": {
-      "enemyHpMultiplier": 2.8,
-      "bossHpMultiplier": 3.2,
-      "enemyCountBonus": 2,
-      "goldPerPlayerMultiplier": 0.6
-    }
-  },
   "globalBalance": {
     "baseDrawPerTurn": 5,
     "baseEnergyPerTurn": 3,
     "maxHandSize": 10,
     "maxPotionSlots": 3,
-    "blockDecayRate": 1.0,
-    "eliteGoldBonus": 25,
-    "bossGoldBonus": 50,
+    "startingGold": 99,
     "restHealPercent": 30,
-    "mapNodesPerFloor": { "min": 3, "max": 5 },
+    "eliteGoldReward": 50,
+    "bossGoldReward": 100,
+    "normalGoldRewardMin": 15,
+    "normalGoldRewardMax": 30,
+    "potionDropChance": 0.4,
+    "cardRemovalCost": 75
+  },
+  "formation": {
+    "backRowFirstRangedBonus": 1.20,
+    "frontRowBlockBonus": 3,
+    "rowSwitchEnergyCost": 1
+  },
+  "aggro": {
+    "aggroPerDamage": 1.0,
+    "aggroPerHealing": 0.5,
+    "aggroPerBuff": 2.0,
+    "aggroDecayRate": 0.8,
+    "taunterBonusAggro": 100.0
+  },
+  "shopPrices": {
+    "cardCommon": 50,
+    "cardUncommon": 75,
+    "cardRare": 150,
+    "potionCommon": 50,
+    "potionUncommon": 75,
+    "potionRare": 100,
+    "implantCommon": 100,
+    "implantUncommon": 175,
+    "implantRare": 250,
+    "implantLegendary": 400
+  },
+  "mapGeneration": {
+    "actsTotal": 3,
+    "floorsPerAct": 15,
+    "nodesPerRowMin": 2,
+    "nodesPerRowMax": 4,
+    "branchChance": 0.4,
     "eventChance": 0.15,
-    "eliteChance": 0.12,
+    "eliteChanceBase": 0.2,
     "shopChance": 0.10,
     "restChance": 0.10
-  },
-  "synergyLinkBalance": {
-    "linkWindowTurns": 1,
-    "maxPendingLinks": 3,
-    "baseResponseBonusPercent": 50,
-    "noResponsePenaltyPercent": 0
   }
 }

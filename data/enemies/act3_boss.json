@@ -2,78 +2,69 @@
   {
     "id": "babel_core",
     "name": "巴别核心",
-    "nameEn": "Babel Core",
+    "maxHp": 500,
+    "preferredRow": "back",
+    "isElite": false,
     "isBoss": true,
-    "hp": 500,
-    "formation": "back",
-    "description": "最终Boss。巴别塔遗迹的核心意识体，拥有多种形态和极强的适应能力。",
+    "minHpScalePerPlayer": 100,
+    "intentPatterns": [
+      { "type": "attack", "value": 14, "scope": "singleAny", "weight": 1.0, "description": "光矛 14" }
+    ],
     "phases": [
       {
-        "name": "phase1_guardian",
         "hpThreshold": 1.0,
-        "description": "守卫形态：均衡攻防",
-        "intents": [
-          { "type": "attack", "damage": 16, "target": "highestAggro", "weight": 25, "description": "光矛" },
-          { "type": "attackAll", "damage": 10, "target": "all", "weight": 20, "description": "能量波" },
-          { "type": "defend", "block": 25, "weight": 20, "description": "绝对防御" },
-          { "type": "summon", "summonId": "guardian_construct", "count": 2, "weight": 15, "description": "召唤守卫", "cooldown": 4 },
-          { "type": "debuff", "debuffId": "Weak", "value": 1, "target": "allPlayers", "weight": 20, "description": "压迫力场" }
+        "entryEffect": "巴别核心展开守卫形态",
+        "intentPatterns": [
+          { "type": "attack",  "value": 16, "scope": "singleAny",  "weight": 2.0, "description": "光矛 16" },
+          { "type": "attack",  "value": 10, "scope": "all",        "weight": 1.5, "description": "能量波 10 (全体)" },
+          { "type": "defend",  "value": 25, "scope": "self",       "weight": 1.5, "description": "绝对防御 25" },
+          { "type": "summon",  "value": 2,  "scope": "self",       "weight": 1.0, "description": "召唤守卫构造体×2" },
+          { "type": "debuff",  "value": 1,  "scope": "all",        "weight": 1.0, "description": "压迫力场 (全体虚弱1)" }
         ]
       },
       {
-        "name": "phase2_destroyer",
         "hpThreshold": 0.7,
-        "description": "毁灭形态：高伤害 + AOE",
-        "intents": [
-          { "type": "attack", "damage": 24, "target": "highestAggro", "weight": 30, "description": "毁灭光束" },
-          { "type": "attackAll", "damage": 15, "target": "all", "weight": 25, "description": "星碎" },
-          { "type": "buff", "buffId": "Strength", "value": 3, "target": "self", "weight": 20, "description": "破坏增幅" },
-          { "type": "debuff", "debuffId": "Vulnerable", "value": 2, "target": "frontRow", "weight": 25, "description": "防线瓦解" }
+        "entryEffect": "⚠️ 巴别核心切换至毁灭形态！",
+        "intentPatterns": [
+          { "type": "attack",  "value": 24, "scope": "singleAny",  "weight": 2.0, "description": "毁灭光束 24" },
+          { "type": "attack",  "value": 15, "scope": "all",        "weight": 2.0, "description": "星碎 15 (全体)" },
+          { "type": "buff",    "value": 3,  "scope": "self",       "weight": 1.0, "description": "破坏增幅 (力量+3)" },
+          { "type": "debuff",  "value": 2,  "scope": "allFront",   "weight": 1.0, "description": "防线瓦解 (前排易伤2)" }
         ]
       },
       {
-        "name": "phase3_controller",
         "hpThreshold": 0.4,
-        "description": "控制形态：大量 debuff + 环境操控",
-        "intents": [
-          { "type": "attack", "damage": 20, "target": "random", "weight": 20, "description": "精神裂变" },
-          { "type": "debuff", "debuffId": "Weak", "value": 2, "target": "allPlayers", "weight": 25, "description": "意识压制" },
-          { "type": "debuff", "debuffId": "Vulnerable", "value": 2, "target": "allPlayers", "weight": 20, "description": "防御崩溃" },
-          { "type": "changeEnvironment", "weight": 15, "description": "现实改写", "cooldown": 3 },
-          { "type": "attackAll", "damage": 18, "target": "all", "weight": 20, "description": "次元撕裂" }
+        "entryEffect": "⚠️ 巴别核心进入控制形态——战场规则将改变！",
+        "intentPatterns": [
+          { "type": "attack",  "value": 20, "scope": "singleAny",  "weight": 1.5, "keywords": ["lock"], "description": "🔒 精神裂变 20 [锁定]" },
+          { "type": "debuff",  "value": 2,  "scope": "all",        "weight": 2.0, "description": "意识压制 (全体虚弱2)" },
+          { "type": "debuff",  "value": 2,  "scope": "all",        "weight": 1.5, "description": "防御崩溃 (全体易伤2)" },
+          { "type": "attack",  "value": 18, "scope": "all",        "weight": 1.5, "description": "次元撕裂 18 (全体)" }
         ]
       },
       {
-        "name": "phase4_desperation",
         "hpThreshold": 0.15,
-        "description": "绝望形态：不惜一切代价消灭玩家",
-        "intents": [
-          { "type": "attack", "damage": 35, "target": "lowestHp", "weight": 35, "description": "终极审判" },
-          { "type": "attackAll", "damage": 20, "target": "all", "weight": 35, "description": "虚空崩塌" },
-          { "type": "buff", "buffId": "Strength", "value": 5, "target": "self", "weight": 30, "description": "最终超载" }
+        "entryEffect": "🔥 巴别核心进入绝望形态——核心暴露，受伤倍增！",
+        "intentPatterns": [
+          { "type": "attack",  "value": 30, "scope": "singleAny",  "weight": 2.0, "keywords": ["breakCover"], "description": "💥 终焉冲击 30 [破阵]" },
+          { "type": "attack",  "value": 20, "scope": "all",        "weight": 2.0, "description": "末日脉冲 20 (全体)" },
+          { "type": "buff",    "value": 5,  "scope": "self",       "weight": 1.0, "description": "核心暴走 (力量+5)" },
+          { "type": "attack",  "value": 35, "scope": "singleBack", "weight": 1.5, "description": "绝望凝视 35 (后排)" }
         ]
       }
-    ],
-    "adaptiveWeight": 0.40,
-    "specialAbilities": [
-      { "id": "firewall", "trigger": "everyNTurns", "interval": 2, "description": "清除入侵进度" },
-      { "id": "analyze", "trigger": "everyNTurns", "interval": 1, "description": "每回合适应玩家策略" },
-      { "id": "formShift", "trigger": "onPhaseChange", "description": "切换形态时清除所有 debuff 并获得 30 护甲" },
-      { "id": "regenerate", "trigger": "everyNTurns", "interval": 3, "description": "每3回合回复 5% 最大HP" }
-    ],
-    "loot": { "gold": { "min": 150, "max": 200 }, "relicDrop": true, "implantChance": 1.0, "victoryReward": true }
+    ]
   },
   {
     "id": "guardian_construct",
     "name": "守卫构造体",
-    "nameEn": "Guardian Construct",
-    "hp": 40,
-    "isSummon": true,
-    "formation": "front",
-    "intents": [
-      { "type": "attack", "damage": 10, "target": "highestAggro", "weight": 40, "description": "能量斩击" },
-      { "type": "defend", "block": 12, "target": "allAllies", "weight": 30, "description": "护盾投射" },
-      { "type": "taunt", "weight": 30, "description": "守卫协议" }
+    "maxHp": 40,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "attack", "value": 8,  "scope": "singleFront", "weight": 2.0, "description": "守卫打击 8" },
+      { "type": "buff",   "value": 1,  "scope": "self",        "weight": 1.0, "description": "嘲讽 (获得嘲讽)" },
+      { "type": "defend", "value": 10, "scope": "allEnemies",  "weight": 1.0, "description": "守卫护盾 (全体+10)" }
     ]
   }
 ]

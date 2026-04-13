@@ -1,0 +1,25 @@
+{
+  "id": "psion",
+  "name": "灵能者",
+  "nameEn": "Psion",
+  "description": "念力操控者，擅长后排远程输出与共鸣爆发。",
+  "maxHp": 65,
+  "startRow": "back",
+  "baseEnergy": 3,
+  "drawPerTurn": 5,
+  "classResource": {
+    "id": "resonance",
+    "statusType": "Resonance",
+    "displayName": "共鸣",
+    "displayNameEn": "Resonance",
+    "startValue": 0
+  },
+  "starterDeckCardIds": [
+    "psi_bolt", "psi_bolt", "psi_bolt", "psi_bolt",
+    "psi_shield", "psi_shield", "psi_shield", "psi_shield",
+    "focus"
+  ],
+  "unlockCondition": "win_1",
+  "color": "#A855F7",
+  "iconPath": "res://resources/textures/characters/psion_icon.png"
+}

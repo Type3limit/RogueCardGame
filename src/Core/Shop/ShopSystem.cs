@@ -2,7 +2,6 @@ using RogueCardGame.Core.Cards;
 using RogueCardGame.Core.Deck;
 using RogueCardGame.Core.Implants;
 using RogueCardGame.Core.Potions;
-using RogueCardGame.Core.Relics;
 
 namespace RogueCardGame.Core.Shop;
 
@@ -19,7 +18,6 @@ public class ShopItem
 
     // The actual item data (one of these is non-null)
     public CardData? CardData { get; init; }
-    public RelicData? RelicData { get; init; }
     public PotionData? PotionData { get; init; }
     public ImplantData? ImplantData { get; init; }
 
@@ -35,7 +33,6 @@ public class ShopItem
 public enum ShopItemType
 {
     Card,
-    Relic,
     Potion,
     Implant,
     CardRemoval
@@ -62,7 +59,6 @@ public class ShopManager
     /// </summary>
     public void GenerateShop(
         CardDatabase cardDb,
-        RelicDatabase relicDb,
         PotionDatabase potionDb,
         ImplantDatabase implantDb,
         CardClass playerClass,
@@ -72,9 +68,6 @@ public class ShopManager
 
         // 5 cards (mix of class and colorless)
         GenerateCardItems(cardDb, playerClass, 5);
-
-        // 2 relics
-        GenerateRelicItems(relicDb, 2);
 
         // 2 potions
         GeneratePotionItems(potionDb, 2);
@@ -104,24 +97,6 @@ public class ShopManager
             Items.Add(new ShopItem(card.Id, card.Name, price, ShopItemType.Card)
             {
                 CardData = card
-            });
-        }
-    }
-
-    private void GenerateRelicItems(RelicDatabase relicDb, int count)
-    {
-        var pool = relicDb.GetByRarity(RelicRarity.Common)
-            .Concat(relicDb.GetByRarity(RelicRarity.Uncommon))
-            .Concat(relicDb.GetByRarity(RelicRarity.Shop))
-            .ToList();
-        _random.Shuffle(pool);
-
-        foreach (var relic in pool.Take(count))
-        {
-            int price = GetRelicPrice(relic.Rarity);
-            Items.Add(new ShopItem(relic.Id, relic.Name, price, ShopItemType.Relic)
-            {
-                RelicData = relic
             });
         }
     }
@@ -162,14 +137,6 @@ public class ShopManager
         CardRarity.Uncommon => 75,
         CardRarity.Rare => 150,
         _ => 50
-    };
-
-    private static int GetRelicPrice(RelicRarity rarity) => rarity switch
-    {
-        RelicRarity.Common => 150,
-        RelicRarity.Uncommon => 250,
-        RelicRarity.Shop => 200,
-        _ => 200
     };
 
     private static int GetPotionPrice(PotionRarity rarity) => rarity switch

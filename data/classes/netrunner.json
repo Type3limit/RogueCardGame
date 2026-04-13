@@ -1,0 +1,25 @@
+{
+  "id": "netrunner",
+  "name": "黑客",
+  "nameEn": "Netrunner",
+  "description": "数据操控者，擅长协议栈构建与控制。安全环境中逐步构建致命连锁。",
+  "maxHp": 70,
+  "startRow": "back",
+  "baseEnergy": 3,
+  "drawPerTurn": 5,
+  "classResource": {
+    "id": "protocol_stack",
+    "statusType": "ProtocolStack",
+    "displayName": "协议栈",
+    "displayNameEn": "Protocol Stack",
+    "startValue": 0
+  },
+  "starterDeckCardIds": [
+    "quick_hack", "quick_hack", "quick_hack", "quick_hack",
+    "firewall", "firewall", "firewall", "firewall",
+    "scan"
+  ],
+  "unlockCondition": "win_2_classes",
+  "color": "#06B6D4",
+  "iconPath": "res://resources/textures/characters/netrunner_icon.png"
+}

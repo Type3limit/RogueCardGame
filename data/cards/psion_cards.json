@@ -20,6 +20,7 @@
     "type": "Skill",
     "rarity": "Starter",
     "cost": 1,
+    "targetType": "self",
     "description": "获得 5 点护甲。获得 1 层共鸣。",
     "effects": [{ "type": "block", "value": 5 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }],
     "upgrade": { "effects": [{ "type": "block", "value": 8 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }] }
@@ -32,6 +33,7 @@
     "type": "Skill",
     "rarity": "Starter",
     "cost": 1,
+    "targetType": "self",
     "description": "获得 2 层共鸣。抽 1 张牌。",
     "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }, { "type": "draw", "value": 1 }],
     "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 3, "target": "self" }, { "type": "draw", "value": 1 }] }
@@ -57,6 +59,7 @@
     "type": "Skill",
     "rarity": "Starter",
     "cost": 1,
+    "targetType": "self",
     "description": "获得 护甲等于共鸣层数×2。",
     "effects": [{ "type": "resonanceBlock", "multiplier": 2 }],
     "upgrade": { "effects": [{ "type": "resonanceBlock", "multiplier": 3 }] }
@@ -95,6 +98,7 @@
     "type": "Skill",
     "rarity": "Common",
     "cost": 1,
+    "targetType": "self",
     "description": "本回合攻击牌伤害 +3。获得 1 层共鸣。",
     "effects": [{ "type": "applyStatus", "statusId": "Strength", "value": 3, "target": "self", "duration": 1 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }],
     "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "Strength", "value": 5, "target": "self", "duration": 1 }, { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }] }
@@ -120,6 +124,7 @@
     "type": "Skill",
     "rarity": "Uncommon",
     "cost": 0,
+    "targetType": "self",
     "description": "查看抽牌堆顶 3 张牌。你可以将其中任意张放入弃牌堆。获得 1 层共鸣。",
     "effects": [{ "type": "scry", "value": 3 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }],
     "upgrade": { "effects": [{ "type": "scry", "value": 5 }, { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }] }
@@ -158,6 +163,7 @@
     "type": "Skill",
     "rarity": "Rare",
     "cost": 1,
+    "targetType": "self",
     "description": "获得 3 层共鸣。下回合开始时再获得 3 层共鸣。",
     "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 3, "target": "self" }, { "type": "delayedResonance", "value": 3 }],
     "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 5, "target": "self" }, { "type": "delayedResonance", "value": 5 }] }

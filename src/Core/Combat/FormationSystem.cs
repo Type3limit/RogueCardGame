@@ -1,3 +1,5 @@
+using RogueCardGame.Core;
+
 namespace RogueCardGame.Core.Combat;
 
 /// <summary>
@@ -15,23 +17,13 @@ public enum FormationRow
 /// </summary>
 public class FormationSystem
 {
-    /// <summary>
-    /// Damage modifier when a melee card is played from the back row.
-    /// </summary>
-    public const float BackRowMeleePenalty = 0.75f;
-
-    /// <summary>
-    /// Damage bonus when a ranged card is played from the back row.
-    /// </summary>
-    public const float BackRowRangedBonus = 1.15f;
-
-    /// <summary>
-    /// Extra block gained when acquiring armor in the front row.
-    /// </summary>
-    public const int FrontRowBlockBonus = 2;
+    public float BackRowFirstRangedBonus => BalanceConfig.Current.Formation.BackRowFirstRangedBonus;
+    public int FrontRowBlockBonus => BalanceConfig.Current.Formation.FrontRowBlockBonus;
 
     private readonly Dictionary<int, FormationRow> _positions = new();
     private readonly HashSet<int> _usedMoveThisTurn = new();
+    // Tracks how many ranged cards each combatant has played this turn
+    private readonly Dictionary<int, int> _rangedPlaysThisTurn = new();
 
     public FormationRow GetPosition(int combatantId)
     {
@@ -73,17 +65,28 @@ public class FormationSystem
 
     /// <summary>
     /// Calculate damage multiplier based on attacker position and card range.
+    /// Back-row ranged: +20% for the FIRST ranged play this turn only.
+    /// Back-row melee: cards are disallowed at the CombatManager level; multiplier = 1.0 as fallback.
     /// </summary>
     public float GetDamageMultiplier(int attackerId, Cards.CardRange range)
     {
         var row = GetPosition(attackerId);
-
-        return (row, range) switch
+        if (row == FormationRow.Back && range == Cards.CardRange.Ranged)
         {
-            (FormationRow.Back, Cards.CardRange.Melee) => BackRowMeleePenalty,
-            (FormationRow.Back, Cards.CardRange.Ranged) => BackRowRangedBonus,
-            _ => 1.0f
-        };
+            int plays = _rangedPlaysThisTurn.GetValueOrDefault(attackerId, 0);
+            return plays == 0 ? BackRowFirstRangedBonus : 1.0f;
+        }
+        return 1.0f;
+    }
+
+    /// <summary>
+    /// Record that a ranged card was played by a combatant this turn.
+    /// Call this after calculating the multiplier.
+    /// </summary>
+    public void RecordRangedPlay(int combatantId)
+    {
+        _rangedPlaysThisTurn[combatantId] =
+            _rangedPlaysThisTurn.GetValueOrDefault(combatantId, 0) + 1;
     }
 
     /// <summary>
@@ -106,14 +109,18 @@ public class FormationSystem
         return alliedIds.Any(id => id != targetId && GetPosition(id) == FormationRow.Front);
     }
 
+    public bool HasMovedThisTurn(int combatantId) => _usedMoveThisTurn.Contains(combatantId);
+
     public void ResetTurnMoves()
     {
         _usedMoveThisTurn.Clear();
+        _rangedPlaysThisTurn.Clear();
     }
 
     public void Clear()
     {
         _positions.Clear();
         _usedMoveThisTurn.Clear();
+        _rangedPlaysThisTurn.Clear();
     }
 }

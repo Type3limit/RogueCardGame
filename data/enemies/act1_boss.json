@@ -2,11 +2,11 @@
   {
     "id": "sentinel_ai",
     "name": "哨戒AI",
-    "maxHp": 250,
+    "maxHp": 280,
     "preferredRow": "back",
     "isElite": false,
     "isBoss": true,
-    "minHpScalePerPlayer": 50,
+    "minHpScalePerPlayer": 55,
     "intentPatterns": [
       { "type": "attack", "value": 10, "scope": "singleFront", "weight": 1.0, "description": "激光扫射 10" }
     ],
@@ -18,19 +18,30 @@
           { "type": "attack",  "value": 12, "scope": "singleAny",  "weight": 2.0, "description": "激光扫射 12" },
           { "type": "attack",  "value": 6,  "scope": "allFront",   "weight": 1.5, "description": "前排压制 6 (全排)" },
           { "type": "defend",  "value": 15, "scope": "self",       "weight": 1.0, "description": "启动护盾 15" },
-          { "type": "summon",  "value": 2,  "scope": "self",       "weight": 1.5, "description": "释放巡逻无人机×2" },
+          { "type": "summon",  "value": 2,  "scope": "self",       "weight": 1.5, "summonId": "patrol_drone", "description": "释放巡逻无人机×2" },
           { "type": "buff",    "value": 2,  "scope": "self",       "weight": 1.0, "description": "战斗分析 (力量+2)" }
         ]
       },
       {
-        "hpThreshold": 0.5,
-        "entryEffect": "⚠️ 哨戒AI进入狂暴模式！伤害大幅提升",
+        "hpThreshold": 0.75,
+        "entryEffect": "⚠️ 哨戒AI进入超频模式！攻击频率大幅增加",
         "intentPatterns": [
-          { "type": "attack",  "value": 18, "scope": "singleAny",  "weight": 2.0, "description": "强化激光 18" },
-          { "type": "attack",  "value": 10, "scope": "all",        "weight": 1.5, "description": "全域轰炸 10 (全体)" },
-          { "type": "summon",  "value": 1,  "scope": "self",       "weight": 1.0, "description": "召唤突击机器人" },
-          { "type": "debuff",  "value": 2,  "scope": "all",        "weight": 1.5, "description": "EMP脉冲 (全体虚弱2)" },
-          { "type": "attack",  "value": 15, "scope": "singleBack", "weight": 1.0, "keywords": ["lock"], "description": "🔒 精准打击后排 15 [锁定]" }
+          { "type": "attack",  "value": 15, "scope": "singleAny",  "weight": 2.5, "description": "超频激光 15" },
+          { "type": "attack",  "value": 10, "hitCount": 2, "scope": "singleAny", "weight": 1.0, "description": "连环猛击 10×2" },
+          { "type": "attack",  "value": 8,  "scope": "all",        "weight": 1.5, "description": "破阵猛击 8 (全体)" },
+          { "type": "summon",  "value": 1,  "scope": "self",       "weight": 1.0, "summonId": "assault_bot", "description": "召唤突击机器人" },
+          { "type": "debuff",  "value": 2,  "scope": "all",        "weight": 1.5, "description": "EMP脉冲 (全体虚弱2)" }
+        ]
+      },
+      {
+        "hpThreshold": 0.4,
+        "entryEffect": "⚠️⚠️ 哨戒AI核心过载！全属性大幅提升",
+        "intentPatterns": [
+          { "type": "attack",  "value": 22, "scope": "singleAny",  "weight": 2.0, "description": "毁灭激光 22" },
+          { "type": "attack",  "value": 12, "scope": "all",        "weight": 1.5, "description": "全域轰炸 12 (全体)" },
+          { "type": "summon",  "value": 1,  "scope": "self",       "weight": 1.0, "summonId": "assault_bot", "description": "召唤突击机器人" },
+          { "type": "debuff",  "value": 3,  "scope": "all",        "weight": 1.5, "description": "EMP脉冲 (全体虚弱3)" },
+          { "type": "attack",  "value": 18, "scope": "singleBack", "weight": 1.0, "keywords": ["lock"], "description": "🔒 精准打击后排 18 [锁定]" }
         ]
       }
     ]

@@ -160,8 +160,18 @@ public class MapGenerator
 
     private int CalculateNodeCount(int row, int totalRows)
     {
-        // Wider in middle, narrower at start/end
+        // Fork rows: guarantee 3-4 nodes for meaningful route choice
         float progress = (float)row / totalRows;
+        float forkSpacing = 1f / 4f; // 4 fork layers ensures >= 3
+        bool isForkRow = progress > 0.05f && progress < 0.95f
+            && (Math.Abs(progress - forkSpacing) < 0.08f
+             || Math.Abs(progress - forkSpacing * 2) < 0.08f
+             || Math.Abs(progress - forkSpacing * 3) < 0.08f
+             || Math.Abs(progress - 0.85f) < 0.08f);
+
+        if (isForkRow) return _random.Next(3, MaxPaths + 1);
+
+        // Start/end: narrower
         if (progress < 0.15f) return _random.Next(2, 3);
         if (progress > 0.85f) return _random.Next(2, 3);
         return _random.Next(MinPaths, MaxPaths + 1);
@@ -175,22 +185,16 @@ public class MapGenerator
         if (row == 0) return RoomType.Combat;
         if (row == totalRows / 2) return RoomType.RestSite; // Midpoint rest
 
-        // Weighted random for other rows
+        // No elites before row 3 to give players time to build
+        if (row <= 2) return _random.NextDouble() < 0.7 ? RoomType.Combat : RoomType.Event;
+
+        // Weighted: Combat 50%, Elite 15%, Event 15%, Shop 10%, Rest 10%
         float roll = (float)_random.NextDouble();
-
-        // Elite fights more common in later rows
-        float eliteChance = progress * 0.2f;
-        if (roll < eliteChance && row > 3) return RoomType.EliteCombat;
-        roll -= eliteChance;
-
-        // Room type distribution
-        if (roll < 0.35f) return RoomType.Combat;
-        if (roll < 0.50f) return RoomType.Event;
-        if (roll < 0.60f) return RoomType.Shop;
-        if (roll < 0.70f) return RoomType.RestSite;
-        if (roll < 0.78f) return RoomType.Treasure;
-
-        return RoomType.Combat;
+        if (roll < 0.50f) return RoomType.Combat;
+        if (roll < 0.65f) return RoomType.EliteCombat;
+        if (roll < 0.80f) return RoomType.Event;
+        if (roll < 0.90f) return RoomType.Shop;
+        return RoomType.RestSite;
     }
 
     private void ConnectRows(List<MapNode> previous, List<MapNode> current)

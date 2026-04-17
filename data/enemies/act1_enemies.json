@@ -11,7 +11,7 @@
     "minHpScalePerPlayer": 12,
     "intentPatterns": [
       { "type": "attack", "value": 8, "scope": "singleFront", "weight": 2.0, "description": "攻击 8" },
-      { "type": "attack", "value": 5, "hitCount": 2, "scope": "singleFront", "weight": 1.0, "description": "攻击 5×2" },
+      { "type": "attack", "value": 5, "hitCount": 2, "scope": "singleFront", "weight": 1.0, "keywords": ["breakCover"], "description": "💥 破甲打击 5×2 [破阵]" },
       { "type": "defend", "value": 8, "scope": "self", "weight": 1.0, "description": "防御 8" }
     ]
   },
@@ -27,7 +27,7 @@
     "minHpScalePerPlayer": 8,
     "intentPatterns": [
       { "type": "attack", "value": 5, "scope": "singleFront", "weight": 2.0, "description": "攻击 5" },
-      { "type": "attack", "value": 12, "scope": "singleFront", "weight": 1.0, "description": "重击 12" },
+      { "type": "attack", "value": 12, "scope": "singleAny", "weight": 1.0, "description": "重击 12 (任意)" },
       { "type": "attackDefend", "value": 6, "scope": "singleFront", "weight": 1.0, "description": "攻击 6 + 防御 3" }
     ]
   },
@@ -78,6 +78,30 @@
     ]
   },
   {
+    "id": "patrol_drone",
+    "name": "巡逻无人机",
+    "maxHp": 20,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "attack", "value": 5, "scope": "singleFront", "weight": 2.0, "description": "激光射击 5" },
+      { "type": "defend", "value": 5, "scope": "allEnemies", "weight": 1.0, "description": "护盾投射 (全体+5)" }
+    ]
+  },
+  {
+    "id": "assault_bot",
+    "name": "突击机器人",
+    "maxHp": 35,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "attack", "value": 10, "scope": "singleFront", "weight": 2.0, "keywords": ["breakCover"], "description": "💥 重拳打击 10 [破阵]" },
+      { "type": "buff", "value": 1, "scope": "self", "weight": 0.5, "description": "过载充能 (力量+1)" }
+    ]
+  },
+  {
     "id": "cyber_guardian",
     "name": "赛博守卫",
     "maxHp": 80,
@@ -91,8 +115,76 @@
       { "type": "attack", "value": 12, "scope": "singleFront", "weight": 2.0, "description": "重拳 12" },
       { "type": "attack", "value": 6, "hitCount": 3, "scope": "singleFront", "weight": 1.0, "description": "连击 6×3" },
       { "type": "defend", "value": 15, "scope": "self", "weight": 1.5, "description": "强化装甲 15" },
-      { "type": "debuff", "value": 2, "scope": "singleFront", "weight": 1.0, "description": "破甲 (脆弱2)" },
+      { "type": "debuff", "value": 2, "scope": "singleFront", "weight": 1.0, "statusId": "Vulnerable", "description": "破甲 (脆弱2)" },
       { "type": "attack", "value": 20, "scope": "allFront", "weight": 0.5, "description": "冲击波 20 (前排)" }
+    ]
+  },
+  {
+    "id": "emp_overlord",
+    "name": "EMP超控者",
+    "maxHp": 90,
+    "preferredRow": "back",
+    "isElite": true,
+    "isBoss": false,
+    "isHackable": true,
+    "hackThreshold": 20,
+    "minHpScalePerPlayer": 22,
+    "mechanic": "每3回合释放一次全场EMP，施加虚弱2并清除所有增益",
+    "intentPatterns": [
+      { "type": "attack", "value": 10, "scope": "singleAny", "weight": 2.0, "description": "电磁脉冲 10" },
+      { "type": "debuff", "value": 2, "scope": "all", "weight": 1.5, "statusId": "Weak", "description": "⚡ 全域干扰 (全体虚弱2)" },
+      { "type": "defend", "value": 12, "scope": "self", "weight": 1.0, "description": "能量护盾 12" },
+      { "type": "attack", "value": 6, "hitCount": 2, "scope": "singleBack", "weight": 1.5, "description": "⚡ 集束放电 6×2 (后排)" },
+      { "type": "buff", "value": 3, "scope": "self", "weight": 0.5, "description": "过载模式 (力量+3)" }
+    ]
+  },
+  {
+    "id": "nano_swarm_queen",
+    "name": "纳米虫群女王",
+    "maxHp": 70,
+    "preferredRow": "back",
+    "isElite": true,
+    "isBoss": false,
+    "isHackable": true,
+    "hackThreshold": 12,
+    "minHpScalePerPlayer": 18,
+    "mechanic": "每2回合召唤1只纳米幼虫，幼虫存活时女王获得群体护盾",
+    "intentPatterns": [
+      { "type": "attack", "value": 8, "scope": "singleAny", "weight": 2.0, "description": "虫群噬咬 8" },
+      { "type": "summon", "value": 1, "scope": "self", "weight": 1.5, "summonId": "nano_larva", "description": "🐝 孵化纳米幼虫" },
+      { "type": "defend", "value": 10, "scope": "allEnemies", "weight": 1.0, "description": "虫群护盾 (全体+10)" },
+      { "type": "attack", "value": 5, "scope": "allFront", "weight": 1.0, "description": "虫群冲击 5 (前排)" },
+      { "type": "heal", "value": 10, "scope": "self", "weight": 0.5, "description": "吞噬修复 10" }
+    ]
+  },
+  {
+    "id": "nano_larva",
+    "name": "纳米幼虫",
+    "maxHp": 15,
+    "preferredRow": "front",
+    "isElite": false,
+    "isBoss": false,
+    "intentPatterns": [
+      { "type": "attack", "value": 4, "scope": "singleFront", "weight": 2.0, "description": "撕咬 4" },
+      { "type": "buff", "value": 1, "scope": "allEnemies", "weight": 1.0, "description": "信息素 (全体力量+1)" }
+    ]
+  },
+  {
+    "id": "overclocked_enforcer",
+    "name": "超频执法者",
+    "maxHp": 95,
+    "preferredRow": "front",
+    "isElite": true,
+    "isBoss": false,
+    "isHackable": false,
+    "minHpScalePerPlayer": 25,
+    "mechanic": "每回合结束时获得1层超频，超频层数增加攻击力但每3层降低防御",
+    "intentPatterns": [
+      { "type": "attack", "value": 10, "scope": "singleFront", "weight": 2.0, "description": "铁拳 10" },
+      { "type": "attack", "value": 15, "scope": "singleFront", "weight": 1.0, "keywords": ["breakCover"], "description": "💥 超频重锤 15 [破阵]" },
+      { "type": "attack", "value": 8, "hitCount": 2, "scope": "singleAny", "weight": 1.0, "description": "连环打击 8×2" },
+      { "type": "defend", "value": 10, "scope": "self", "weight": 1.5, "description": "重型装甲 10" },
+      { "type": "buff", "value": 2, "scope": "self", "weight": 0.8, "description": "🔥 超频加速 (力量+2)" }
     ]
   }
 ]

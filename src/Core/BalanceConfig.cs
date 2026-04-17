@@ -52,6 +52,8 @@ public sealed class GlobalBalanceDef
     public int NormalGoldRewardMax { get; init; } = 30;
     public float PotionDropChance { get; init; } = 0.4f;
     public int CardRemovalCost { get; init; } = 75;
+    /// <summary>Hack stacks required to stun an enemy for 1 turn (resets after trigger).</summary>
+    public int HackThreshold { get; init; } = 100;
 }
 
 public sealed class FormationBalanceDef

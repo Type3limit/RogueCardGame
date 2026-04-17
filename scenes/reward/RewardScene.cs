@@ -18,10 +18,14 @@ public partial class RewardScene : Control
     private List<CardData> _cardRewards = [];
     private int _revealIndex;
     private readonly List<Control> _pendingCards = [];
+    private readonly Dictionary<PanelContainer, CyberCardFactory.CardVisual> _rewardCardVisuals = [];
+    private readonly Dictionary<PanelContainer, CardData> _rewardCardDefs = [];
     private TopBarHUD? _topBar;
 
     public override void _Ready()
     {
+        GameManager.Instance.SetCurrentRunScene("reward");
+
         _title = GetNode<Label>("Title");
         _rewardList = GetNode<VBoxContainer>("RewardList");
         _cardRewardArea = GetNode<HBoxContainer>("CardRewardArea");
@@ -59,15 +63,25 @@ public partial class RewardScene : Control
         if (_revealIndex < allItems.Count)
         {
             var item = allItems[_revealIndex];
-            item.Modulate = new Color(1, 1, 1, 0);
             item.Visible = true;
-            var tw = CreateTween();
-            tw.TweenProperty(item, "modulate:a", 1.0f, 0.25f)
-                .SetTrans(Tween.TransitionType.Cubic);
-            tw.Parallel().TweenProperty(item, "position:y",
-                item.Position.Y, 0.25f)
-                .From(item.Position.Y + 20f)
-                .SetTrans(Tween.TransitionType.Back);
+
+            if (item is PanelContainer panel && _rewardCardVisuals.TryGetValue(panel, out var visual))
+            {
+                bool emphasizeRare = _rewardCardDefs.TryGetValue(panel, out var data) && data.Rarity == CardRarity.Rare;
+                CyberCardFactory.PlayDropReveal(visual, emphasizeRare);
+            }
+            else
+            {
+                item.Modulate = new Color(1, 1, 1, 0);
+                var tw = CreateTween();
+                tw.TweenProperty(item, "modulate:a", 1.0f, 0.25f)
+                    .SetTrans(Tween.TransitionType.Cubic);
+                tw.Parallel().TweenProperty(item, "position:y",
+                    item.Position.Y, 0.25f)
+                    .From(item.Position.Y + 20f)
+                    .SetTrans(Tween.TransitionType.Back);
+            }
+
             _revealIndex++;
         }
     }
@@ -146,13 +160,43 @@ public partial class RewardScene : Control
             }
         }
 
-        // Relic drop for elite/boss
-        if (isElite || isBoss)
+        // Elite: pick 1 implant from 2 choices (implant swap)
+        if (isElite)
         {
-            AddRewardItem("🔮", "随机遗物", new Color(0.7f, 0.5f, 1f), false, () =>
+            var implantPool = run.ImplantDb.GetForClass(run.Player.Class)
+                .Where(data => run.Implants.GetAllEquipped().All(equipped => equipped.Data.Id != data.Id))
+                .ToList();
+            run.Random.Shuffle(implantPool);
+            foreach (var implant in implantPool.Take(2))
             {
-                AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
-            });
+                string label = implant.Rarity >= ImplantRarity.Rare ? $"⭐ {implant.Name}" : implant.Name;
+                AddRewardItem("⚙", label, new Color(0.7f, 0.5f, 1f), false, () =>
+                {
+                    run.Implants.Equip(implant);
+                    AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+                    _topBar?.Refresh();
+                });
+            }
+        }
+
+        // Boss: guaranteed rare/legendary implant
+        if (isBoss)
+        {
+            var bossPool = run.ImplantDb.GetForClass(run.Player.Class)
+                .Where(data => data.Rarity >= ImplantRarity.Rare)
+                .Where(data => run.Implants.GetAllEquipped().All(equipped => equipped.Data.Id != data.Id))
+                .ToList();
+            if (bossPool.Count > 0)
+            {
+                var implant = bossPool[run.Random.Next(bossPool.Count)];
+                string rarityTag = implant.Rarity == ImplantRarity.Legendary ? "🏆 " : "⭐ ";
+                AddRewardItem("⚙", $"{rarityTag}{implant.Name}", new Color(0.9f, 0.7f, 1f), false, () =>
+                {
+                    run.Implants.Equip(implant);
+                    AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+                    _topBar?.Refresh();
+                });
+            }
         }
 
         GenerateCardRewards(run);
@@ -202,6 +246,7 @@ public partial class RewardScene : Control
         }
         else
         {
+            bool claimed = false;
             var tag = new Label { Text = "点击领取 →" };
             tag.AddThemeFontSizeOverride("font_size", 16);
             tag.AddThemeColorOverride("font_color", new Color(0.4f, 0.8f, 0.8f));
@@ -209,14 +254,17 @@ public partial class RewardScene : Control
 
             panel.GuiInput += (ev) =>
             {
+                if (claimed) return;
+
                 if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
                 {
+                    claimed = true;
                     onCollect?.Invoke();
                     tag.Text = "✓ 已获得";
                     tag.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f));
                     style.BorderColor = new Color(0.2f, 0.2f, 0.2f);
                     style.ShadowSize = 0;
-                    panel.GuiInput -= null!; // no-op but prevents repeated clicks
+                    panel.MouseDefaultCursorShape = CursorShape.Arrow;
                 }
             };
 
@@ -231,6 +279,7 @@ public partial class RewardScene : Control
                 var tw = CreateTween();
                 tw.TweenProperty(panel, "modulate", Colors.White, 0.15f);
             };
+            panel.MouseDefaultCursorShape = CursorShape.PointingHand;
         }
 
         panel.AddChild(hbox);
@@ -261,117 +310,17 @@ public partial class RewardScene : Control
 
     private PanelContainer CreateCardRewardPanel(CardData cardData)
     {
-        var typeColor = cardData.Type switch
-        {
-            CardType.Attack => new Color(0.85f, 0.2f, 0.2f),
-            CardType.Skill => new Color(0.2f, 0.5f, 0.85f),
-            CardType.Power => new Color(0.8f, 0.6f, 0.15f),
-            _ => new Color(0.4f, 0.4f, 0.4f)
-        };
-
-        var rarityColor = cardData.Rarity switch
-        {
-            CardRarity.Rare => new Color(1f, 0.85f, 0.1f),
-            CardRarity.Uncommon => new Color(0.4f, 0.7f, 1f),
-            _ => new Color(0.6f, 0.6f, 0.6f)
-        };
-
-        var panel = new PanelContainer();
-        panel.CustomMinimumSize = new Vector2(200, 280);
-
-        var style = new StyleBoxFlat
-        {
-            BgColor = new Color(0.06f, 0.06f, 0.1f, 0.98f),
-            BorderColor = typeColor * 0.6f,
-            BorderWidthBottom = 2, BorderWidthTop = 2,
-            BorderWidthLeft = 2, BorderWidthRight = 2,
-            CornerRadiusBottomLeft = 12, CornerRadiusBottomRight = 12,
-            CornerRadiusTopLeft = 12, CornerRadiusTopRight = 12,
-            ContentMarginLeft = 14, ContentMarginRight = 14,
-            ContentMarginTop = 12, ContentMarginBottom = 12,
-            ShadowColor = typeColor * 0.2f,
-            ShadowSize = 8
-        };
-        panel.AddThemeStyleboxOverride("panel", style);
-
-        var vbox = new VBoxContainer();
-        vbox.AddThemeConstantOverride("separation", 6);
-
-        // Cost badge + type
-        var topRow = new HBoxContainer();
-        var costBadge = new Label { Text = $"[{cardData.Cost}]" };
-        costBadge.AddThemeFontSizeOverride("font_size", 24);
-        costBadge.AddThemeColorOverride("font_color", new Color(0f, 0.9f, 0.9f));
-        topRow.AddChild(costBadge);
-
-        var spacer = new Control();
-        spacer.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        topRow.AddChild(spacer);
-
-        string typeIcon = cardData.Type switch
-        {
-            CardType.Attack => "⚔",
-            CardType.Skill => "🛡",
-            CardType.Power => "⚡",
-            _ => "?"
-        };
-        var typeLabel = new Label { Text = typeIcon };
-        typeLabel.AddThemeFontSizeOverride("font_size", 22);
-        topRow.AddChild(typeLabel);
-        vbox.AddChild(topRow);
-
-        // Name
-        var nameLabel = new Label { Text = cardData.Name };
-        nameLabel.AddThemeFontSizeOverride("font_size", 20);
-        nameLabel.AddThemeColorOverride("font_color", Colors.White);
-        nameLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        vbox.AddChild(nameLabel);
-
-        // Rarity tag
-        string rarityText = cardData.Rarity switch
-        {
-            CardRarity.Rare => "★ 稀有",
-            CardRarity.Uncommon => "◆ 罕见",
-            _ => "○ 普通"
-        };
-        var rarityLabel = new Label { Text = rarityText };
-        rarityLabel.AddThemeFontSizeOverride("font_size", 14);
-        rarityLabel.AddThemeColorOverride("font_color", rarityColor);
-        rarityLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        vbox.AddChild(rarityLabel);
-
-        // Divider
-        var divider = new ColorRect();
-        divider.CustomMinimumSize = new Vector2(0, 2);
-        divider.Color = typeColor * 0.4f;
-        vbox.AddChild(divider);
-
-        // Description
-        var desc = new Label { Text = cardData.Description };
-        desc.AddThemeFontSizeOverride("font_size", 14);
-        desc.AddThemeColorOverride("font_color", new Color(0.75f, 0.75f, 0.8f));
-        desc.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        desc.SizeFlagsVertical = SizeFlags.ExpandFill;
-        vbox.AddChild(desc);
-
-        panel.AddChild(vbox);
-
-        // Hover & click
-        panel.MouseEntered += () =>
-        {
-            var tw = CreateTween();
-            tw.TweenProperty(panel, "scale", new Vector2(1.05f, 1.05f), 0.15f)
-                .SetTrans(Tween.TransitionType.Back);
-            style.BorderColor = Colors.White;
-            style.ShadowSize = 14;
-        };
-        panel.MouseExited += () =>
-        {
-            var tw = CreateTween();
-            tw.TweenProperty(panel, "scale", Vector2.One, 0.15f);
-            style.BorderColor = typeColor * 0.6f;
-            style.ShadowSize = 8;
-        };
+        var visual = CyberCardFactory.CreateGameplayCard(
+            cardData,
+            new Vector2(200, 296),
+            compact: false,
+            footer: "加入牌组",
+            showDescription: true);
+        var panel = visual.Root;
+        CyberCardFactory.AttachHover(visual, scale: 1.05f, hoverShadow: 16);
+        panel.MouseEntered += () => AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonHover);
+        _rewardCardVisuals[panel] = visual;
+        _rewardCardDefs[panel] = cardData;
 
         panel.GuiInput += (ev) =>
         {
@@ -392,34 +341,43 @@ public partial class RewardScene : Control
         AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
         run.AddCardToDeck(cardData);
 
-        // Dim non-selected cards, highlight selected
+        if (_rewardCardVisuals.TryGetValue(selectedPanel, out var selectedVisual))
+            CyberCardFactory.PlaySelectionConfirm(selectedVisual);
+
         foreach (var child in _cardRewardArea.GetChildren())
         {
-            if (child is PanelContainer pc)
+            if (child is not PanelContainer panel)
+                continue;
+
+            panel.MouseDefaultCursorShape = CursorShape.Arrow;
+            panel.MouseFilter = MouseFilterEnum.Ignore;
+
+            var tw = CreateTween();
+            if (panel == selectedPanel)
             {
-                if (pc == selectedPanel)
-                {
-                    var tw = CreateTween();
-                    tw.TweenProperty(pc, "modulate", new Color(1.3f, 1.3f, 1.3f), 0.3f);
-                }
-                else
-                {
-                    var tw = CreateTween();
-                    tw.TweenProperty(pc, "modulate", new Color(0.3f, 0.3f, 0.3f, 0.5f), 0.3f);
-                }
-                // Disable further input
-                pc.MouseFilter = MouseFilterEnum.Ignore;
+                tw.TweenProperty(panel, "scale", new Vector2(1.06f, 1.06f), 0.22f)
+                    .SetTrans(Tween.TransitionType.Back)
+                    .SetEase(Tween.EaseType.Out);
+                tw.Parallel().TweenProperty(panel, "modulate", new Color(1.15f, 1.15f, 1.15f), 0.22f);
+            }
+            else
+            {
+                tw.TweenProperty(panel, "modulate:a", 0.22f, 0.18f);
             }
         }
 
-        // Auto return to map
-        var timer = GetTree().CreateTimer(1.0);
-        timer.Timeout += () => SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+        var timer = GetTree().CreateTimer(0.8);
+        timer.Timeout += () =>
+        {
+            GameManager.Instance.SetCurrentRunScene("map");
+            SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+        };
     }
 
     private void OnSkipPressed()
     {
         AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+        GameManager.Instance.SetCurrentRunScene("map");
         SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
     }
 }

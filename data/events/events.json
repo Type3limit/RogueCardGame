@@ -33,17 +33,19 @@
       {
         "text": "用 80 金币购买神秘容器",
         "outcomes": [
-          { "effect": "gainRelic", "probability": 0.6, "flavorText": "容器中是一件珍贵的遗物！" },
-          { "effect": "gainPotion", "probability": 0.4, "flavorText": "只是一瓶普通药水...不过也不亏。" }
+          { "effect": "loseGold", "value": 80, "flavorText": "你支付了高昂的代价。" },
+          { "effect": "gainImplant", "probability": 0.35, "flavorText": "容器中竟是一枚稀有植入体！" },
+          { "effect": "gainPotion", "probability": 0.65, "flavorText": "至少还有一瓶能救命的药剂。" }
         ],
         "condition": "gold>=80"
       },
       {
-        "text": "用 20 零件交换情报",
+        "text": "支付 45 金币进行系统校准 (移除一张牌)",
         "outcomes": [
-          { "effect": "gainGold", "value": 100, "flavorText": "商人给了你一份秘密通道的坐标，能卖不少钱。" }
+          { "effect": "loseGold", "value": 45, "flavorText": "商人开始为你校准神经链路。" },
+          { "effect": "removeCard", "flavorText": "一段冗余的战斗程序被从你的牌组中剔除了。" }
         ],
-        "condition": "parts>=20"
+        "condition": "gold>=45&&hasRemovableCard"
       },
       {
         "text": "礼貌拒绝",
@@ -63,7 +65,8 @@
         "outcomes": [
           { "effect": "upgradeCard", "flavorText": "高强度训练让你掌握了更强的技巧。" },
           { "effect": "loseHp", "value": 10 }
-        ]
+        ],
+        "condition": "hasUpgradableCard"
       },
       {
         "text": "进行体能训练 (获得 5 最大生命值)",
@@ -89,12 +92,13 @@
         "text": "接入节点 (移除一张牌)",
         "outcomes": [
           { "effect": "removeCard", "flavorText": "多余的数据被清除，你的系统更加精简了。" }
-        ]
+        ],
+        "condition": "hasRemovableCard"
       },
       {
-        "text": "下载数据 (获得 15 零件)",
+        "text": "下载数据 (随机获得 1 个植入体)",
         "outcomes": [
-          { "effect": "gainParts", "value": 15, "flavorText": "节点中包含有价值的蓝图数据。" }
+          { "effect": "gainImplant", "flavorText": "节点中残留着一份可直接部署的植入体蓝图。" }
         ]
       },
       {
@@ -111,15 +115,16 @@
     "description": "路边躺着一个受重伤的士兵。他看到你后露出希望的眼神。",
     "choices": [
       {
-        "text": "治疗他 (失去 15 HP，获得遗物)",
+        "text": "治疗他 (失去 15 HP，获得随机植入体)",
         "outcomes": [
           { "effect": "loseHp", "value": 15 },
-          { "effect": "gainRelic", "flavorText": "作为感谢，他给了你一件随身携带的装备。" }
+          { "effect": "gainImplant", "flavorText": "作为感谢，他拆下自己的备用植入体交给了你。" }
         ]
       },
       {
         "text": "给他一瓶药水 (失去一瓶药水，获得 30 金币)",
         "outcomes": [
+          { "effect": "losePotion", "flavorText": "你把一瓶药水递给了他。" },
           { "effect": "gainGold", "value": 30, "flavorText": "他给了你一些积蓄作为报答。" }
         ],
         "condition": "hasPotion"
@@ -128,6 +133,178 @@
         "text": "路过",
         "outcomes": [
           { "effect": "nothing", "flavorText": "你装作没看见，继续前行。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "neural_hack_terminal",
+    "title": "神经入侵终端",
+    "description": "一台军用级神经接入终端，外壳覆盖着锈迹。屏幕闪烁着旧世界的警告标志。你能感受到一股微弱的信号在呼唤你。",
+    "isOneTime": true,
+    "choices": [
+      {
+        "text": "深度入侵 (失去 20 HP，获得 2 张随机卡牌)",
+        "outcomes": [
+          { "effect": "loseHp", "value": 20 },
+          { "effect": "gainCard", "value": 2, "flavorText": "神经数据涌入你的芯片——两段全新的战斗协议已下载完成。" }
+        ]
+      },
+      {
+        "text": "浅层扫描 (获得 100 金币)",
+        "outcomes": [
+          { "effect": "gainGold", "value": 100, "flavorText": "你小心翼翼地截取了缓存中的资金数据。" }
+        ]
+      },
+      {
+        "text": "反向工程 (升级 2 张随机牌)",
+        "outcomes": [
+          { "effect": "upgradeCard", "value": 2, "flavorText": "你将终端的底层逻辑注入了自己的战斗协议中。" }
+        ],
+        "condition": "hasUpgradableCard"
+      }
+    ]
+  },
+  {
+    "id": "corporate_vault",
+    "title": "公司金库残骸",
+    "description": "一座崩塌的公司总部下方，你发现了一个被炸开的金库。金币散落在地，但陷阱机关的红光仍在闪烁。",
+    "choices": [
+      {
+        "text": "冒险进入 (70% 获得 150 金币，30% 失去 25 HP)",
+        "outcomes": [
+          { "effect": "gainGold", "value": 150, "probability": 0.7, "flavorText": "你灵敏地避开了所有陷阱，将金币装入囊中。" },
+          { "effect": "loseHp", "value": 25, "probability": 0.3, "flavorText": "陷阱触发！电磁弹片击中了你。" }
+        ]
+      },
+      {
+        "text": "用远程设备触发陷阱 (安全但获得 30 金币)",
+        "outcomes": [
+          { "effect": "gainGold", "value": 30, "flavorText": "陷阱被安全触发后，你捡到了一些残余的金币。" }
+        ]
+      },
+      {
+        "text": "离开",
+        "outcomes": [
+          { "effect": "nothing", "flavorText": "不值得冒这个险。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "rogue_ai_offering",
+    "title": "流氓AI的提议",
+    "description": "一个自称\"契约者\"的AI投影突然出现在你面前。它提出一个交易：用你的生命能量换取强大的能力。",
+    "choices": [
+      {
+        "text": "接受交易 (失去 25% 当前 HP，获得稀有植入体)",
+        "outcomes": [
+          { "effect": "loseHpPercent", "value": 0.25, "flavorText": "痛苦从神经末梢传来，但新植入的芯片已经在你的意识中闪烁。" },
+          { "effect": "gainImplant", "flavorText": "一枚散发着暗紫色光芒的植入体融入了你的身体。" }
+        ]
+      },
+      {
+        "text": "谈判 (失去 10 金币，50% 获得植入体)",
+        "outcomes": [
+          { "effect": "loseGold", "value": 10, "flavorText": "AI收下了你的\"诚意金\"。" },
+          { "effect": "gainImplant", "probability": 0.5, "flavorText": "AI似乎对你的谈判能力印象深刻，给了你一份\"样品\"。" },
+          { "effect": "nothing", "probability": 0.5, "flavorText": "AI笑了笑消失在数据流中，什么都没留下。" }
+        ],
+        "condition": "gold>=10"
+      },
+      {
+        "text": "拒绝并攻击 (失去 15 HP，获得 50 金币)",
+        "outcomes": [
+          { "effect": "loseHp", "value": 15, "flavorText": "AI的防御系统反击了你，但在消散前留下了一些信用点数据。" },
+          { "effect": "gainGold", "value": 50, "flavorText": "你截获了它的部分资金。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "glitch_market",
+    "title": "故障市场",
+    "description": "一个空间扭曲的黑市区域。商品价格在不断波动，商人似乎也不太正常。",
+    "choices": [
+      {
+        "text": "购买 \"幸运骰子\" (60 金币，随机获得 1-3 个植入体)",
+        "outcomes": [
+          { "effect": "loseGold", "value": 60, "flavorText": "你投下了金币。" },
+          { "effect": "gainImplant", "value": 2, "probability": 0.4, "flavorText": "运气不错！骰子显示了你的幸运数字。" },
+          { "effect": "gainImplant", "value": 1, "probability": 0.35, "flavorText": "一个植入体从扭曲的空间中弹出。" },
+          { "effect": "gainGold", "value": 20, "probability": 0.25, "flavorText": "骰子爆炸了，但吐出了一些金币作为补偿。" }
+        ],
+        "condition": "gold>=60"
+      },
+      {
+        "text": "出售一张卡牌 (失去 1 张随机牌，获得 80 金币)",
+        "outcomes": [
+          { "effect": "removeCard", "flavorText": "商人用一个发光的容器吸走了你的一段战斗程序。" },
+          { "effect": "gainGold", "value": 80, "flavorText": "商人满意地数着金币递给你。" }
+        ],
+        "condition": "hasRemovableCard"
+      },
+      {
+        "text": "离开",
+        "outcomes": [
+          { "effect": "nothing", "flavorText": "这个市场太诡异了，你决定不冒险。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "last_stand_memorial",
+    "title": "最后的纪念碑",
+    "description": "一座斑驳的纪念碑矗立在废墟中，碑文记录着旧世界最后的战士们。触摸纪念碑，你能感受到一股温暖的能量。",
+    "isOneTime": true,
+    "choices": [
+      {
+        "text": "献上金币获得祝福 (失去所有金币，获得最大生命值+15)",
+        "outcomes": [
+          { "effect": "loseGoldAll", "flavorText": "你将所有金币放在碑前。金色的光芒涌入你的身体。" },
+          { "effect": "gainMaxHp", "value": 15, "flavorText": "纪念碑赋予了你战士的祝福，你的生命力增强了！" }
+        ],
+        "condition": "gold>0"
+      },
+      {
+        "text": "静默祈祷 (恢复 30% 最大生命值)",
+        "outcomes": [
+          { "effect": "healPercent", "value": 0.3, "flavorText": "你在碑前静立片刻，伤痛在温暖的能量中渐渐消退。" }
+        ]
+      },
+      {
+        "text": "解读碑文 (获得 2 张卡牌并升级其中 1 张)",
+        "outcomes": [
+          { "effect": "gainCard", "value": 2, "flavorText": "碑文中隐藏着古代战士的战斗技巧。" },
+          { "effect": "upgradeCard", "value": 1, "flavorText": "其中一段特别深奥的技法被你领悟，升级为更强版本。" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data_storm",
+    "title": "数据风暴",
+    "description": "天空中突然出现了混乱的数据流。电磁风暴正在逼近，你必须做出快速选择。",
+    "choices": [
+      {
+        "text": "逆风而行 (失去 10 HP，获得 75 金币)",
+        "outcomes": [
+          { "effect": "loseHp", "value": 10, "flavorText": "数据碎片割伤了你，但你穿越了风暴中心。" },
+          { "effect": "gainGold", "value": 75, "flavorText": "风暴中心聚集了大量漂浮的信用点数据。" }
+        ]
+      },
+      {
+        "text": "利用风暴充电 (获得 5 最大 HP，失去 20 金币)",
+        "outcomes": [
+          { "effect": "gainMaxHp", "value": 5, "flavorText": "你将电磁能量导入自己的增强系统中，感觉更强大了。" },
+          { "effect": "loseGold", "value": 20, "flavorText": "充电过程中烧坏了一些设备。" }
+        ],
+        "condition": "gold>=20"
+      },
+      {
+        "text": "躲避 (无事发生)",
+        "outcomes": [
+          { "effect": "nothing", "flavorText": "你找到了一处掩体，等待风暴过去。" }
         ]
       }
     ]

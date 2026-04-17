@@ -45,9 +45,10 @@ public class ShopManager
 {
     private readonly SeededRandom _random;
     public List<ShopItem> Items { get; } = [];
-    public int CardRemovalCost { get; set; } = 75;
+    public int CardRemovalCost { get; set; } = BalanceConfig.Current.GlobalBalance.CardRemovalCost;
 
-    public event Action<ShopItem>? OnItemPurchased;
+    /// <summary>Price multiplier based on act number. Act 1 = 1.0x, Act 2 = 1.25x, Act 3 = 1.5x.</summary>
+    public float ActPriceMultiplier { get; private set; } = 1f;
 
     public ShopManager(SeededRandom random)
     {
@@ -56,6 +57,7 @@ public class ShopManager
 
     /// <summary>
     /// Generate shop inventory for the current act/floor.
+    /// Prices scale with act number.
     /// </summary>
     public void GenerateShop(
         CardDatabase cardDb,
@@ -65,6 +67,7 @@ public class ShopManager
         int actNumber)
     {
         Items.Clear();
+        ActPriceMultiplier = 1f + (actNumber - 1) * 0.25f;
 
         // 5 cards (mix of class and colorless)
         GenerateCardItems(cardDb, playerClass, 5);
@@ -75,9 +78,12 @@ public class ShopManager
         // 1 implant
         GenerateImplantItems(implantDb, playerClass, 1);
 
-        // Card removal service
-        Items.Add(new ShopItem("card_removal", "移除卡牌", CardRemovalCost, ShopItemType.CardRemoval));
+        // Card removal service (scales with act)
+        int removalCost = ScalePrice(CardRemovalCost);
+        Items.Add(new ShopItem("card_removal", "移除卡牌", removalCost, ShopItemType.CardRemoval));
     }
+
+    private int ScalePrice(int basePrice) => (int)(basePrice * ActPriceMultiplier);
 
     private void GenerateCardItems(CardDatabase cardDb, CardClass playerClass, int count)
     {
@@ -93,7 +99,7 @@ public class ShopManager
 
         foreach (var card in pool.Take(count))
         {
-            int price = GetCardPrice(card.Rarity);
+            int price = ScalePrice(GetCardPrice(card.Rarity));
             Items.Add(new ShopItem(card.Id, card.Name, price, ShopItemType.Card)
             {
                 CardData = card
@@ -108,7 +114,7 @@ public class ShopManager
 
         foreach (var potion in pool.Take(count))
         {
-            int price = GetPotionPrice(potion.Rarity);
+            int price = ScalePrice(GetPotionPrice(potion.Rarity));
             Items.Add(new ShopItem(potion.Id, potion.Name, price, ShopItemType.Potion)
             {
                 PotionData = potion
@@ -123,7 +129,7 @@ public class ShopManager
 
         foreach (var implant in pool.Take(count))
         {
-            int price = GetImplantPrice(implant.Rarity);
+            int price = ScalePrice(GetImplantPrice(implant.Rarity));
             Items.Add(new ShopItem(implant.Id, implant.Name, price, ShopItemType.Implant)
             {
                 ImplantData = implant
@@ -131,28 +137,40 @@ public class ShopManager
         }
     }
 
-    private static int GetCardPrice(CardRarity rarity) => rarity switch
+    private static int GetCardPrice(CardRarity rarity)
     {
-        CardRarity.Common => 50,
-        CardRarity.Uncommon => 75,
-        CardRarity.Rare => 150,
-        _ => 50
-    };
+        var prices = BalanceConfig.Current.ShopPrices;
+        return rarity switch
+        {
+            CardRarity.Common => prices.CardCommon,
+            CardRarity.Uncommon => prices.CardUncommon,
+            CardRarity.Rare => prices.CardRare,
+            _ => prices.CardCommon
+        };
+    }
 
-    private static int GetPotionPrice(PotionRarity rarity) => rarity switch
+    private static int GetPotionPrice(PotionRarity rarity)
     {
-        PotionRarity.Common => 50,
-        PotionRarity.Uncommon => 75,
-        PotionRarity.Rare => 100,
-        _ => 50
-    };
+        var prices = BalanceConfig.Current.ShopPrices;
+        return rarity switch
+        {
+            PotionRarity.Common => prices.PotionCommon,
+            PotionRarity.Uncommon => prices.PotionUncommon,
+            PotionRarity.Rare => prices.PotionRare,
+            _ => prices.PotionCommon
+        };
+    }
 
-    private static int GetImplantPrice(ImplantRarity rarity) => rarity switch
+    private static int GetImplantPrice(ImplantRarity rarity)
     {
-        ImplantRarity.Common => 100,
-        ImplantRarity.Uncommon => 175,
-        ImplantRarity.Rare => 250,
-        ImplantRarity.Legendary => 400,
-        _ => 150
-    };
+        var prices = BalanceConfig.Current.ShopPrices;
+        return rarity switch
+        {
+            ImplantRarity.Common => prices.ImplantCommon,
+            ImplantRarity.Uncommon => prices.ImplantUncommon,
+            ImplantRarity.Rare => prices.ImplantRare,
+            ImplantRarity.Legendary => prices.ImplantLegendary,
+            _ => prices.ImplantCommon
+        };
+    }
 }

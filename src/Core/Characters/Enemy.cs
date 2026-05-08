@@ -15,6 +15,7 @@ public enum EnemyIntentType
     Summon,
     Heal,
     Special,
+    Disabled,  // Melee enemy pushed to back row — wastes its turn
     Unknown
 }
 
@@ -28,7 +29,10 @@ public sealed class EnemyIntent
     public int HitCount { get; init; } = 1;
     public TargetScope Scope { get; init; } = TargetScope.SingleFront;
     public string? Description { get; init; }
+    public string? StatusId { get; init; }
     public List<string> Keywords { get; init; } = [];
+    /// <summary>For Summon intents: the enemy ID to spawn. Value = count to summon.</summary>
+    public string? SummonId { get; init; }
 }
 
 /// <summary>
@@ -85,11 +89,14 @@ public sealed class EnemyIntentPattern
     public TargetScope Scope { get; init; } = TargetScope.SingleFront;
     public float Weight { get; init; } = 1.0f;
     public string? Description { get; init; }
+    public string? StatusId { get; init; }
     /// <summary>
     /// Position keywords that modify how this intent works.
     /// Supported: "lock" (apply Rooted to target), "breakCover" (splash to back row).
     /// </summary>
     public List<string> Keywords { get; init; } = [];
+    /// <summary>For Summon intents: the enemy ID to spawn (from enemy JSON database).</summary>
+    public string? SummonId { get; init; }
 }
 
 /// <summary>

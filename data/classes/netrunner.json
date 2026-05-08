@@ -16,8 +16,9 @@
   },
   "starterDeckCardIds": [
     "quick_hack", "quick_hack", "quick_hack", "quick_hack",
-    "firewall", "firewall", "firewall", "firewall",
-    "scan"
+    "proxy_shield", "proxy_shield",
+    "compile",
+    "execute", "execute"
   ],
   "unlockCondition": "win_2_classes",
   "color": "#06B6D4",

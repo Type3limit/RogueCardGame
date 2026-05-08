@@ -11,7 +11,8 @@
     "normalGoldRewardMin": 15,
     "normalGoldRewardMax": 30,
     "potionDropChance": 0.4,
-    "cardRemovalCost": 75
+    "cardRemovalCost": 75,
+    "hackThreshold": 100
   },
   "formation": {
     "backRowFirstRangedBonus": 1.20,

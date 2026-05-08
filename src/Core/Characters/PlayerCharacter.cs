@@ -43,7 +43,19 @@ public class PlayerCharacter : Combatant
     {
         CardClass.Vanguard => Powers.GetStacks(CommonPowerIds.Overcharge),
         CardClass.Psion => Powers.GetStacks(CommonPowerIds.Resonance),
+        CardClass.Netrunner => Powers.GetStacks(CommonPowerIds.ProtocolStack),
+        CardClass.Symbiote => Powers.GetStacks(CommonPowerIds.Thorns), // 侵蚀 = 荆棘层数作为资源表现
         _ => 0
+    };
+
+    /// <summary>The PowerId that corresponds to this class's resource, if any. Used to suppress duplicate display in UI.</summary>
+    public string? ClassResourcePowerId => Class switch
+    {
+        CardClass.Vanguard => CommonPowerIds.Overcharge,
+        CardClass.Psion => CommonPowerIds.Resonance,
+        CardClass.Netrunner => CommonPowerIds.ProtocolStack,
+        CardClass.Symbiote => CommonPowerIds.Thorns,
+        _ => null
     };
 
     public PlayerCharacter(string name, CardClass @class, int maxHp)

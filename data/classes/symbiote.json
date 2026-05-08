@@ -16,8 +16,8 @@
   },
   "starterDeckCardIds": [
     "bio_strike", "bio_strike", "bio_strike", "bio_strike",
-    "carapace", "carapace", "carapace", "carapace",
-    "symbiotic_link"
+    "chitin_armor", "chitin_armor", "chitin_armor", "chitin_armor",
+    "regenerate"
   ],
   "unlockCondition": "reach_floor_30",
   "color": "#22C55E",

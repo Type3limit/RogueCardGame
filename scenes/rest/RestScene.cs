@@ -18,9 +18,12 @@ public partial class RestScene : Control
     private ColorRect? _glowRect;
     private float _glowTime;
     private TopBarHUD? _topBar;
+    private Control? _upgradeConfirmOverlay;
 
     public override void _Ready()
     {
+        GameManager.Instance.SetCurrentRunScene("rest");
+
         _title = GetNode<Label>("Title");
         _hpLabel = GetNode<Label>("HpLabel");
         _restBtn = GetNode<Button>("OptionsContainer/RestBtn");
@@ -245,118 +248,413 @@ public partial class RestScene : Control
 
     private PanelContainer CreateCardUpgradePanel(Card card)
     {
-        var typeColor = card.Data.Type switch
-        {
-            CardType.Attack => new Color(0.85f, 0.2f, 0.2f),
-            CardType.Skill => new Color(0.2f, 0.5f, 0.85f),
-            CardType.Power => new Color(0.8f, 0.6f, 0.15f),
-            _ => new Color(0.4f, 0.4f, 0.4f)
-        };
-
-        var panel = new PanelContainer();
-        panel.CustomMinimumSize = new Vector2(180, 130);
-
-        var style = new StyleBoxFlat
-        {
-            BgColor = typeColor * 0.1f,
-            BorderColor = typeColor * 0.5f,
-            BorderWidthBottom = 2, BorderWidthTop = 2,
-            BorderWidthLeft = 2, BorderWidthRight = 2,
-            CornerRadiusBottomLeft = 10, CornerRadiusBottomRight = 10,
-            CornerRadiusTopLeft = 10, CornerRadiusTopRight = 10,
-            ContentMarginLeft = 10, ContentMarginRight = 10,
-            ContentMarginTop = 8, ContentMarginBottom = 8,
-            ShadowColor = typeColor * 0.15f,
-            ShadowSize = 4
-        };
-        panel.AddThemeStyleboxOverride("panel", style);
-
-        var vbox = new VBoxContainer();
-        vbox.AddThemeConstantOverride("separation", 4);
-
-        // Cost + type
-        var topRow = new HBoxContainer();
-        var costLabel = new Label { Text = $"[{card.CurrentCost}]" };
-        costLabel.AddThemeFontSizeOverride("font_size", 20);
-        costLabel.AddThemeColorOverride("font_color", new Color(0f, 0.9f, 0.9f));
-        topRow.AddChild(costLabel);
-
-        var spacer = new Control();
-        spacer.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        topRow.AddChild(spacer);
-
-        string typeIcon = card.Data.Type switch
-        {
-            CardType.Attack => "⚔",
-            CardType.Skill => "🛡",
-            CardType.Power => "⚡",
-            _ => "?"
-        };
-        var typeLabel = new Label { Text = typeIcon };
-        typeLabel.AddThemeFontSizeOverride("font_size", 18);
-        topRow.AddChild(typeLabel);
-        vbox.AddChild(topRow);
-
-        // Name
-        var nameLabel = new Label { Text = card.DisplayName };
-        nameLabel.AddThemeFontSizeOverride("font_size", 17);
-        nameLabel.AddThemeColorOverride("font_color", Colors.White);
-        nameLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        vbox.AddChild(nameLabel);
-
-        // Upgrade hint
-        var hint = new Label { Text = "⬆ 点击升级" };
-        hint.AddThemeFontSizeOverride("font_size", 13);
-        hint.AddThemeColorOverride("font_color", new Color(0.3f, 0.7f, 1f));
-        hint.HorizontalAlignment = HorizontalAlignment.Center;
-        vbox.AddChild(hint);
-
-        panel.AddChild(vbox);
-
-        // Hover
-        panel.MouseEntered += () =>
-        {
-            var tw = CreateTween();
-            tw.TweenProperty(panel, "scale", new Vector2(1.05f, 1.05f), 0.12f)
-                .SetTrans(Tween.TransitionType.Back);
-            style.BorderColor = typeColor;
-            style.ShadowSize = 10;
-        };
-        panel.MouseExited += () =>
-        {
-            var tw = CreateTween();
-            tw.TweenProperty(panel, "scale", Vector2.One, 0.12f);
-            style.BorderColor = typeColor * 0.5f;
-            style.ShadowSize = 4;
-        };
+        var visual = CyberCardFactory.CreateGameplayCard(
+            card,
+            new Vector2(190, 190),
+            compact: true,
+            footer: "点击预览升级",
+            showDescription: true);
+        var panel = visual.Root;
+        CyberCardFactory.AttachHover(visual, scale: 1.05f, hoverShadow: 12);
+        panel.MouseDefaultCursorShape = CursorShape.PointingHand;
 
         panel.GuiInput += (ev) =>
         {
             if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
             {
-                card.Upgrade();
                 AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
-
-                // Flash
-                var flash = new ColorRect();
-                flash.SetAnchorsPreset(LayoutPreset.FullRect);
-                flash.Color = new Color(0.3f, 0.6f, 1f, 0.25f);
-                flash.MouseFilter = MouseFilterEnum.Ignore;
-                AddChild(flash);
-                var tw = CreateTween();
-                tw.TweenProperty(flash, "color:a", 0f, 0.5f);
-                tw.TweenCallback(Callable.From(() => flash.QueueFree()));
-
-                var timer = GetTree().CreateTimer(0.6);
-                timer.Timeout += GoToMap;
+                ShowUpgradeConfirm(card);
             }
         };
 
         return panel;
     }
 
+    private void ShowUpgradeConfirm(Card card)
+    {
+        if (card.Data.Upgrade?.HasBranches == true)
+        {
+            ShowBranchUpgradeConfirm(card);
+            return;
+        }
+
+        // Remove any existing overlay
+        _upgradeConfirmOverlay?.QueueFree();
+
+        // Full-screen dimmed backdrop
+        var backdrop = new ColorRect
+        {
+            Color = new Color(0f, 0f, 0f, 0.75f),
+            ZIndex = 200,
+        };
+        backdrop.SetAnchorsPreset(LayoutPreset.FullRect);
+        backdrop.MouseFilter = MouseFilterEnum.Stop;
+        backdrop.GuiInput += ev =>
+        {
+            if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+            {
+                _upgradeConfirmOverlay?.QueueFree();
+                _upgradeConfirmOverlay = null;
+            }
+        };
+
+        // Centered modal
+        var modal = new PanelContainer { MouseFilter = MouseFilterEnum.Stop };
+        modal.SetAnchorsPreset(LayoutPreset.FullRect);
+        modal.AnchorLeft = 0.05f; modal.AnchorRight = 0.95f;
+        modal.AnchorTop = 0.06f; modal.AnchorBottom = 0.94f;
+        modal.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.04f, 0.05f, 0.09f, 0.98f),
+            BorderColor = new Color(0.28f, 0.48f, 0.75f, 0.78f),
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 14, CornerRadiusBottomRight = 14,
+            CornerRadiusTopLeft = 14, CornerRadiusTopRight = 14,
+            ContentMarginLeft = 22, ContentMarginRight = 22,
+            ContentMarginTop = 18, ContentMarginBottom = 18,
+        });
+
+        var root = new VBoxContainer();
+        root.AddThemeConstantOverride("separation", 14);
+
+        // Header
+        var header = new Label { Text = "升级预览", HorizontalAlignment = HorizontalAlignment.Center };
+        header.AddThemeFontSizeOverride("font_size", 28);
+        header.AddThemeColorOverride("font_color", new Color(0.4f, 0.72f, 1f));
+        root.AddChild(header);
+
+        // Before / after card row
+        var cardRow = new HBoxContainer { SizeFlagsVertical = SizeFlags.Expand };
+        cardRow.AddThemeConstantOverride("separation", 20);
+
+        // "Before" column
+        var beforeCol = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.Expand };
+        beforeCol.AddThemeConstantOverride("separation", 6);
+        var beforeHdr = new Label { Text = "升级前", HorizontalAlignment = HorizontalAlignment.Center };
+        beforeHdr.AddThemeFontSizeOverride("font_size", 15);
+        beforeHdr.AddThemeColorOverride("font_color", new Color(0.55f, 0.65f, 0.78f));
+        beforeCol.AddChild(beforeHdr);
+        var beforeVisual = CyberCardFactory.CreateGameplayCard(
+            card, new Vector2(210, 300), compact: false, showDescription: true);
+        beforeVisual.Root.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        beforeVisual.Root.MouseFilter = MouseFilterEnum.Ignore;
+        beforeCol.AddChild(beforeVisual.Root);
+        cardRow.AddChild(beforeCol);
+
+        // Arrow
+        var arrowContainer = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        arrowContainer.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+        var arrow = new Label { Text = "➜", VerticalAlignment = VerticalAlignment.Center };
+        arrow.AddThemeFontSizeOverride("font_size", 40);
+        arrow.AddThemeColorOverride("font_color", new Color(0.3f, 0.88f, 0.45f));
+        arrowContainer.AddChild(arrow);
+        cardRow.AddChild(arrowContainer);
+
+        // "After" column (cloned + upgraded)
+        var afterCol = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.Expand };
+        afterCol.AddThemeConstantOverride("separation", 6);
+        var afterHdr = new Label { Text = "升级后", HorizontalAlignment = HorizontalAlignment.Center };
+        afterHdr.AddThemeFontSizeOverride("font_size", 15);
+        afterHdr.AddThemeColorOverride("font_color", new Color(0.3f, 0.88f, 0.45f));
+        afterCol.AddChild(afterHdr);
+        var upgradedClone = card.Clone();
+        upgradedClone.Upgrade();
+        var afterVisual = CyberCardFactory.CreateGameplayCard(
+            upgradedClone, new Vector2(210, 300), compact: false, showDescription: true);
+        afterVisual.Root.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        afterVisual.Root.MouseFilter = MouseFilterEnum.Ignore;
+        afterCol.AddChild(afterVisual.Root);
+        cardRow.AddChild(afterCol);
+
+        root.AddChild(cardRow);
+
+        // Button row
+        var btnRow = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        btnRow.AddThemeConstantOverride("separation", 20);
+
+        var cancelBtn = new Button { Text = "×  取消", CustomMinimumSize = new Vector2(140, 46) };
+        cancelBtn.AddThemeFontSizeOverride("font_size", 18);
+        cancelBtn.AddThemeStyleboxOverride("normal", new StyleBoxFlat
+        {
+            BgColor = new Color(0.08f, 0.1f, 0.15f),
+            BorderColor = new Color(0.38f, 0.42f, 0.52f),
+            BorderWidthBottom = 1, BorderWidthTop = 1,
+            BorderWidthLeft = 1, BorderWidthRight = 1,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 14, ContentMarginRight = 14,
+            ContentMarginTop = 8, ContentMarginBottom = 8,
+        });
+        cancelBtn.AddThemeColorOverride("font_color", new Color(0.6f, 0.68f, 0.78f));
+        cancelBtn.Pressed += () =>
+        {
+            _upgradeConfirmOverlay?.QueueFree();
+            _upgradeConfirmOverlay = null;
+        };
+        btnRow.AddChild(cancelBtn);
+
+        var confirmBtnStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.06f, 0.2f, 0.1f),
+            BorderColor = new Color(0.28f, 0.72f, 0.38f, 0.9f),
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 18, ContentMarginRight = 18,
+            ContentMarginTop = 8, ContentMarginBottom = 8,
+        };
+        var confirmBtnHover = new StyleBoxFlat
+        {
+            BgColor = new Color(0.1f, 0.3f, 0.16f),
+            BorderColor = new Color(0.3f, 0.92f, 0.45f),
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 18, ContentMarginRight = 18,
+            ContentMarginTop = 8, ContentMarginBottom = 8,
+        };
+        var confirmBtn = new Button { Text = "✓  确认升级", CustomMinimumSize = new Vector2(160, 46) };
+        confirmBtn.AddThemeFontSizeOverride("font_size", 18);
+        confirmBtn.AddThemeStyleboxOverride("normal", confirmBtnStyle);
+        confirmBtn.AddThemeStyleboxOverride("hover", confirmBtnHover);
+        confirmBtn.AddThemeColorOverride("font_color", new Color(0.45f, 1f, 0.55f));
+        confirmBtn.Pressed += () =>
+        {
+            _upgradeConfirmOverlay?.QueueFree();
+            _upgradeConfirmOverlay = null;
+
+            card.Upgrade();
+            AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+
+            var flash = new ColorRect();
+            flash.SetAnchorsPreset(LayoutPreset.FullRect);
+            flash.Color = new Color(0.3f, 0.65f, 1f, 0.28f);
+            flash.MouseFilter = MouseFilterEnum.Ignore;
+            AddChild(flash);
+            var tw = CreateTween();
+            tw.TweenProperty(flash, "color:a", 0f, 0.5f);
+            tw.TweenCallback(Callable.From(() => flash.QueueFree()));
+
+            var timer = GetTree().CreateTimer(0.6);
+            timer.Timeout += GoToMap;
+        };
+        btnRow.AddChild(confirmBtn);
+        root.AddChild(btnRow);
+
+        modal.AddChild(root);
+        backdrop.AddChild(modal);
+        AddChild(backdrop);
+        _upgradeConfirmOverlay = backdrop;
+    }
+
+    private void ShowBranchUpgradeConfirm(Card card)
+    {
+        _upgradeConfirmOverlay?.QueueFree();
+
+        var branchA = card.Data.Upgrade!.BranchA!;
+        var branchB = card.Data.Upgrade!.BranchB!;
+
+        // Full-screen dimmed backdrop
+        var backdrop = new ColorRect
+        {
+            Color = new Color(0f, 0f, 0f, 0.75f),
+            ZIndex = 200,
+        };
+        backdrop.SetAnchorsPreset(LayoutPreset.FullRect);
+        backdrop.MouseFilter = MouseFilterEnum.Stop;
+        backdrop.GuiInput += ev =>
+        {
+            if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+            {
+                _upgradeConfirmOverlay?.QueueFree();
+                _upgradeConfirmOverlay = null;
+            }
+        };
+
+        // Centered modal (wider to fit 3 card columns)
+        var modal = new PanelContainer { MouseFilter = MouseFilterEnum.Stop };
+        modal.SetAnchorsPreset(LayoutPreset.FullRect);
+        modal.AnchorLeft = 0.02f; modal.AnchorRight = 0.98f;
+        modal.AnchorTop = 0.04f; modal.AnchorBottom = 0.96f;
+        modal.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.04f, 0.05f, 0.09f, 0.98f),
+            BorderColor = new Color(0.28f, 0.48f, 0.75f, 0.78f),
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 14, CornerRadiusBottomRight = 14,
+            CornerRadiusTopLeft = 14, CornerRadiusTopRight = 14,
+            ContentMarginLeft = 22, ContentMarginRight = 22,
+            ContentMarginTop = 18, ContentMarginBottom = 18,
+        });
+
+        var root = new VBoxContainer();
+        root.AddThemeConstantOverride("separation", 12);
+
+        // Header
+        var header = new Label { Text = "选择升级分支", HorizontalAlignment = HorizontalAlignment.Center };
+        header.AddThemeFontSizeOverride("font_size", 28);
+        header.AddThemeColorOverride("font_color", new Color(0.4f, 0.72f, 1f));
+        root.AddChild(header);
+
+        // Card row: before | → | branch A | separator | branch B
+        var cardRow = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+        cardRow.AddThemeConstantOverride("separation", 8);
+
+        // "Before" column
+        var beforeCol = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.Expand };
+        beforeCol.AddThemeConstantOverride("separation", 6);
+        var beforeHdr = new Label { Text = "升级前", HorizontalAlignment = HorizontalAlignment.Center };
+        beforeHdr.AddThemeFontSizeOverride("font_size", 15);
+        beforeHdr.AddThemeColorOverride("font_color", new Color(0.55f, 0.65f, 0.78f));
+        beforeCol.AddChild(beforeHdr);
+        var beforeVisual = CyberCardFactory.CreateGameplayCard(
+            card, new Vector2(170, 240), compact: false, showDescription: true);
+        beforeVisual.Root.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        beforeVisual.Root.MouseFilter = MouseFilterEnum.Ignore;
+        beforeCol.AddChild(beforeVisual.Root);
+        cardRow.AddChild(beforeCol);
+
+        // Arrow
+        var arrowContainer = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        arrowContainer.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+        var arrow = new Label { Text = "➜", VerticalAlignment = VerticalAlignment.Center };
+        arrow.AddThemeFontSizeOverride("font_size", 36);
+        arrow.AddThemeColorOverride("font_color", new Color(0.3f, 0.88f, 0.45f));
+        arrowContainer.AddChild(arrow);
+        cardRow.AddChild(arrowContainer);
+
+        // Branch A column
+        var branchACol = BuildBranchOptionColumn(card, branchA, UpgradeBranch.A, new Color(0.3f, 0.75f, 1f));
+        cardRow.AddChild(branchACol);
+
+        // Vertical separator
+        var sep = new ColorRect
+        {
+            Color = new Color(0.28f, 0.48f, 0.75f, 0.3f),
+            CustomMinimumSize = new Vector2(2, 0),
+            SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        cardRow.AddChild(sep);
+
+        // Branch B column
+        var branchBCol = BuildBranchOptionColumn(card, branchB, UpgradeBranch.B, new Color(1f, 0.65f, 0.25f));
+        cardRow.AddChild(branchBCol);
+
+        root.AddChild(cardRow);
+
+        // Cancel button row
+        var btnRow = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        var cancelBtn = new Button { Text = "×  取消", CustomMinimumSize = new Vector2(140, 46) };
+        cancelBtn.AddThemeFontSizeOverride("font_size", 18);
+        cancelBtn.AddThemeStyleboxOverride("normal", new StyleBoxFlat
+        {
+            BgColor = new Color(0.08f, 0.1f, 0.15f),
+            BorderColor = new Color(0.38f, 0.42f, 0.52f),
+            BorderWidthBottom = 1, BorderWidthTop = 1,
+            BorderWidthLeft = 1, BorderWidthRight = 1,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 14, ContentMarginRight = 14,
+            ContentMarginTop = 8, ContentMarginBottom = 8,
+        });
+        cancelBtn.AddThemeColorOverride("font_color", new Color(0.6f, 0.68f, 0.78f));
+        cancelBtn.Pressed += () =>
+        {
+            _upgradeConfirmOverlay?.QueueFree();
+            _upgradeConfirmOverlay = null;
+        };
+        btnRow.AddChild(cancelBtn);
+        root.AddChild(btnRow);
+
+        modal.AddChild(root);
+        backdrop.AddChild(modal);
+        AddChild(backdrop);
+        _upgradeConfirmOverlay = backdrop;
+    }
+
+    private VBoxContainer BuildBranchOptionColumn(Card card, CardUpgradeBranch branch, UpgradeBranch branchType, Color accentColor)
+    {
+        var col = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.Expand };
+        col.AddThemeConstantOverride("separation", 8);
+
+        // Branch name label
+        var nameLabel = new Label
+        {
+            Text = branch.Name,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.Off,
+        };
+        nameLabel.AddThemeFontSizeOverride("font_size", 18);
+        nameLabel.AddThemeColorOverride("font_color", accentColor);
+        col.AddChild(nameLabel);
+
+        // Card preview (clone + upgrade with this branch)
+        var clone = card.Clone();
+        clone.Upgrade(branchType);
+        var visual = CyberCardFactory.CreateGameplayCard(
+            clone, new Vector2(170, 240), compact: false, showDescription: true);
+        visual.Root.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        visual.Root.MouseFilter = MouseFilterEnum.Ignore;
+        col.AddChild(visual.Root);
+
+        // Spacer to push button to bottom
+        var spacer = new Control { SizeFlagsVertical = SizeFlags.ExpandFill };
+        col.AddChild(spacer);
+
+        // Confirm button
+        var btnText = branchType == UpgradeBranch.A ? "✓  选择路线 A" : "✓  选择路线 B";
+        var btn = new Button
+        {
+            Text = btnText,
+            CustomMinimumSize = new Vector2(160, 46),
+            SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
+        };
+        btn.AddThemeFontSizeOverride("font_size", 18);
+        btn.AddThemeStyleboxOverride("normal", new StyleBoxFlat
+        {
+            BgColor = new Color(0.06f, 0.2f, 0.1f),
+            BorderColor = new Color(accentColor.R, accentColor.G, accentColor.B, 0.9f),
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            ContentMarginLeft = 18, ContentMarginRight = 18,
+            ContentMarginTop = 8, ContentMarginBottom = 8,
+        });
+        btn.AddThemeColorOverride("font_color", accentColor);
+        btn.Pressed += () =>
+        {
+            _upgradeConfirmOverlay?.QueueFree();
+            _upgradeConfirmOverlay = null;
+
+            card.Upgrade(branchType);
+            AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+
+            var flash = new ColorRect();
+            flash.SetAnchorsPreset(LayoutPreset.FullRect);
+            flash.Color = new Color(0.3f, 0.65f, 1f, 0.28f);
+            flash.MouseFilter = MouseFilterEnum.Ignore;
+            AddChild(flash);
+            var tw = CreateTween();
+            tw.TweenProperty(flash, "color:a", 0f, 0.5f);
+            tw.TweenCallback(Callable.From(() => flash.QueueFree()));
+
+            var timer = GetTree().CreateTimer(0.6);
+            timer.Timeout += GoToMap;
+        };
+        col.AddChild(btn);
+
+        return col;
+    }
+
     private void GoToMap()
     {
+        GameManager.Instance.SetCurrentRunScene("map");
         SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
     }
 

@@ -64,6 +64,8 @@ public partial class MapScene : Control
 
     public override void _Ready()
     {
+        GameManager.Instance.SetCurrentRunScene("map");
+
         _mapScroll = GetNode<ScrollContainer>("MapScroll");
         _mapContainer = GetNode<Control>("MapScroll/MapContainer");
         _actLabel = GetNode<Label>("TopBar/ActLabel");
@@ -444,21 +446,27 @@ public partial class MapScene : Control
             case RoomType.Combat:
             case RoomType.EliteCombat:
             case RoomType.Boss:
+                GameManager.Instance.SetCurrentRunScene("combat");
                 SceneManager.Instance.ChangeScene(SceneManager.Scenes.Combat);
                 break;
             case RoomType.RestSite:
+                GameManager.Instance.SetCurrentRunScene("rest");
                 SceneManager.Instance.ChangeScene(SceneManager.Scenes.Rest);
                 break;
             case RoomType.Shop:
+                GameManager.Instance.SetCurrentRunScene("shop");
                 SceneManager.Instance.ChangeScene(SceneManager.Scenes.Shop);
                 break;
             case RoomType.Event:
+                GameManager.Instance.SetCurrentRunScene("event");
                 SceneManager.Instance.ChangeScene(SceneManager.Scenes.Event);
                 break;
             case RoomType.Treasure:
+                GameManager.Instance.SetCurrentRunScene("reward");
                 SceneManager.Instance.ChangeScene(SceneManager.Scenes.Reward);
                 break;
             default:
+                GameManager.Instance.SaveCurrentRun();
                 GD.Print($"Unhandled room type: {node.Type}");
                 break;
         }

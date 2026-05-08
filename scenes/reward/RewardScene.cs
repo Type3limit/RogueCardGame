@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using RogueCardGame.Core;
 using RogueCardGame.Core.Cards;
+using RogueCardGame.Core.Implants;
 using RogueCardGame.Core.Map;
 
 namespace RogueCardGame;

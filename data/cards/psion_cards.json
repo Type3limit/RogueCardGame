@@ -3,61 +3,78 @@
     "id": "psi_bolt",
     "name": "灵能弹",
     "nameEn": "Psi Bolt",
-    "class": "Psion",
-    "type": "Attack",
-    "rarity": "Starter",
+    "artPath": "Psion/psi_bolt.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "starter",
     "cost": 1,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "造成 6 点伤害。获得 1 层共鸣。",
     "effects": [{ "type": "damage", "value": 6 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }],
-    "upgrade": { "effects": [{ "type": "damage", "value": 9 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }] }
+    "upgrade": {
+      "branchA": { "name": "强化灵弹", "description": "造成 9 点伤害。获得 1 层共鸣。" },
+      "branchB": { "name": "共鸣灵弹", "description": "造成 6 点伤害。获得 2 层共鸣。" }
+    }
   },
   {
     "id": "mind_ward",
     "name": "心灵屏障",
     "nameEn": "Mind Ward",
-    "class": "Psion",
-    "type": "Skill",
-    "rarity": "Starter",
+    "artPath": "Psion/mind_ward.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "starter",
     "cost": 1,
     "targetType": "self",
     "description": "获得 5 点护甲。获得 1 层共鸣。",
     "effects": [{ "type": "block", "value": 5 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }],
-    "upgrade": { "effects": [{ "type": "block", "value": 8 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }] }
+    "upgrade": {
+      "branchA": { "name": "心灵堡垒", "description": "获得 8 点护甲。获得 1 层共鸣。" },
+      "branchB": { "name": "共鸣护盾", "description": "获得 5 点护甲。获得 2 层共鸣。" }
+    }
   },
   {
     "id": "psi_focus",
     "name": "灵能聚焦",
     "nameEn": "Psi Focus",
-    "class": "Psion",
-    "type": "Skill",
-    "rarity": "Starter",
+    "artPath": "Psion/psi_focus.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "starter",
     "cost": 1,
     "targetType": "self",
     "description": "获得 2 层共鸣。抽 1 张牌。",
     "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }, { "type": "draw", "value": 1 }],
-    "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 3, "target": "self" }, { "type": "draw", "value": 1 }] }
+    "upgrade": {
+      "branchA": { "name": "深度聚焦", "description": "获得 3 层共鸣。抽 1 张牌。" },
+      "branchB": { "name": "迅速聚焦", "description": "获得 2 层共鸣。抽 2 张牌。" }
+    }
   },
   {
     "id": "telekinetic_strike",
     "name": "念动打击",
     "nameEn": "Telekinetic Strike",
-    "class": "Psion",
-    "type": "Attack",
-    "rarity": "Starter",
+    "artPath": "Psion/telekinetic_strike.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "starter",
     "cost": 1,
-    "range": "Ranged",
-    "description": "造成 4 + 共鸣层数 伤害。",
+    "range": "ranged",
+    "description": "造成 4 + 共鸣层数 伤害。（不消耗共鸣）",
     "effects": [{ "type": "resonanceDamage", "baseDamage": 4, "multiplier": 1 }],
-    "upgrade": { "effects": [{ "type": "resonanceDamage", "baseDamage": 6, "multiplier": 1 }] }
+    "upgrade": {
+      "branchA": { "name": "念动强袭", "description": "造成 6 + 共鸣层数 伤害。（不消耗共鸣）" },
+      "branchB": { "name": "念动爆发", "description": "消耗所有共鸣，造成 4 + 每层 3 点伤害。" }
+    }
   },
   {
     "id": "thought_shield",
     "name": "思维护盾",
     "nameEn": "Thought Shield",
-    "class": "Psion",
-    "type": "Skill",
-    "rarity": "Starter",
+    "artPath": "Psion/thought_shield.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "starter",
     "cost": 1,
     "targetType": "self",
     "description": "获得 护甲等于共鸣层数×2。",
@@ -68,11 +85,12 @@
     "id": "resonance_blast",
     "name": "共鸣爆发",
     "nameEn": "Resonance Blast",
-    "class": "Psion",
-    "type": "Attack",
-    "rarity": "Common",
+    "artPath": "Psion/resonance_blast.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "common",
     "cost": 2,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "对所有敌人造成 共鸣×3 伤害。共鸣减半。",
     "effects": [{ "type": "resonanceDamage", "multiplier": 3, "target": "allEnemies" }, { "type": "halveResonance" }],
     "upgrade": { "effects": [{ "type": "resonanceDamage", "multiplier": 4, "target": "allEnemies" }, { "type": "halveResonance" }] }
@@ -81,11 +99,12 @@
     "id": "psychic_scream",
     "name": "灵能尖啸",
     "nameEn": "Psychic Scream",
-    "class": "Psion",
-    "type": "Attack",
-    "rarity": "Common",
+    "artPath": "Psion/psychic_scream.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "common",
     "cost": 1,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "造成 8 伤害。对前排敌人施加 1 层虚弱。",
     "effects": [{ "type": "damage", "value": 8 }, { "type": "applyStatus", "statusId": "Weak", "value": 1, "target": "frontRowEnemies" }],
     "upgrade": { "effects": [{ "type": "damage", "value": 11 }, { "type": "applyStatus", "statusId": "Weak", "value": 2, "target": "frontRowEnemies" }] }
@@ -94,9 +113,10 @@
     "id": "astral_projection",
     "name": "星体投射",
     "nameEn": "Astral Projection",
-    "class": "Psion",
-    "type": "Skill",
-    "rarity": "Common",
+    "artPath": "Psion/astral_projection.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "common",
     "cost": 1,
     "targetType": "self",
     "description": "本回合攻击牌伤害 +3。获得 1 层共鸣。",
@@ -107,11 +127,12 @@
     "id": "mind_control",
     "name": "精神控制",
     "nameEn": "Mind Control",
-    "class": "Psion",
-    "type": "Skill",
-    "rarity": "Uncommon",
+    "artPath": "Psion/mind_control.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "uncommon",
     "cost": 2,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "目标敌人跳过下一次行动。获得 2 层共鸣。",
     "effects": [{ "type": "applyStatus", "statusId": "Stunned", "value": 1 }, { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }],
     "upgrade": { "cost": 1 }
@@ -120,9 +141,10 @@
     "id": "precognition",
     "name": "预知",
     "nameEn": "Precognition",
-    "class": "Psion",
-    "type": "Skill",
-    "rarity": "Uncommon",
+    "artPath": "Psion/precognition.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "uncommon",
     "cost": 0,
     "targetType": "self",
     "description": "查看抽牌堆顶 3 张牌。你可以将其中任意张放入弃牌堆。获得 1 层共鸣。",
@@ -133,11 +155,12 @@
     "id": "psi_storm",
     "name": "灵能风暴",
     "nameEn": "Psi Storm",
-    "class": "Psion",
-    "type": "Attack",
-    "rarity": "Uncommon",
+    "artPath": "Psion/psi_storm.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "uncommon",
     "cost": 3,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "对所有敌人造成 12 伤害。消耗所有共鸣，每层额外 +2 伤害。",
     "effects": [{ "type": "damage", "value": 12, "target": "allEnemies" }, { "type": "consumeResonance", "damagePerStack": 2, "target": "allEnemies" }],
     "upgrade": { "effects": [{ "type": "damage", "value": 15, "target": "allEnemies" }, { "type": "consumeResonance", "damagePerStack": 3, "target": "allEnemies" }] }
@@ -146,11 +169,12 @@
     "id": "neural_overload",
     "name": "神经过载",
     "nameEn": "Neural Overload",
-    "class": "Psion",
-    "type": "Attack",
-    "rarity": "Uncommon",
+    "artPath": "Psion/neural_overload.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "uncommon",
     "cost": 1,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "造成 10 伤害。如果共鸣 >= 5，改为造成 20 伤害。",
     "effects": [{ "type": "conditionalDamage", "baseDamage": 10, "bonusDamage": 20, "condition": "resonance>=5" }],
     "upgrade": { "effects": [{ "type": "conditionalDamage", "baseDamage": 12, "bonusDamage": 24, "condition": "resonance>=5" }] }
@@ -159,9 +183,10 @@
     "id": "meditation",
     "name": "冥想",
     "nameEn": "Meditation",
-    "class": "Psion",
-    "type": "Skill",
-    "rarity": "Rare",
+    "artPath": "Psion/meditation.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "rare",
     "cost": 1,
     "targetType": "self",
     "description": "获得 3 层共鸣。下回合开始时再获得 3 层共鸣。",
@@ -172,11 +197,12 @@
     "id": "singularity",
     "name": "奇点",
     "nameEn": "Singularity",
-    "class": "Psion",
-    "type": "Attack",
-    "rarity": "Rare",
+    "artPath": "Psion/singularity.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "rare",
     "cost": 4,
-    "range": "Ranged",
+    "range": "ranged",
     "exhaust": true,
     "description": "消耗。对单个目标造成 共鸣×8 伤害。共鸣归零。",
     "effects": [{ "type": "resonanceDamage", "multiplier": 8 }, { "type": "clearResonance" }],
@@ -186,13 +212,403 @@
     "id": "resonance_cascade",
     "name": "共鸣级联",
     "nameEn": "Resonance Cascade",
-    "class": "Psion",
-    "type": "Power",
-    "rarity": "Rare",
+    "artPath": "Psion/resonance_cascade.svg",
+    "class": "psion",
+    "type": "power",
+    "rarity": "rare",
     "cost": 3,
     "exhaust": true,
     "description": "永久效果：每回合开始时获得 2 层共鸣。",
     "effects": [{ "type": "applyPower", "powerId": "ResonanceCascade", "value": 2 }],
     "upgrade": { "effects": [{ "type": "applyPower", "powerId": "ResonanceCascade", "value": 3 }] }
+  },
+  {
+    "id": "psi_mark_bolt",
+    "name": "标记弹",
+    "nameEn": "Mark Bolt",
+    "artPath": "Psion/psi_mark_bolt.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 1,
+    "range": "ranged",
+    "description": "造成 5 点伤害。标记目标 1 回合。获得 1 层共鸣。",
+    "effects": [
+      { "type": "damage", "value": 5 },
+      { "type": "applyStatus", "statusId": "Mark", "value": 1 },
+      { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 7 }, { "type": "applyStatus", "statusId": "Mark", "value": 1 }, { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }] }
+  },
+  {
+    "id": "psi_mind_spike",
+    "name": "精神尖刺",
+    "nameEn": "Mind Spike",
+    "artPath": "Psion/psi_mind_spike.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 0,
+    "range": "ranged",
+    "description": "造成 3 点伤害。获得 1 层共鸣。",
+    "effects": [
+      { "type": "damage", "value": 3 },
+      { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 5 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }] }
+  },
+  {
+    "id": "psi_frontline_slam",
+    "name": "前线猛击",
+    "nameEn": "Frontline Slam",
+    "artPath": "Psion/psi_frontline_slam.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 1,
+    "range": "melee",
+    "targetType": "SingleEnemy",
+    "description": "【前排】造成 8 点伤害，获得 2 层共鸣。\n【后排】无法使用。",
+    "effects": [
+      { "type": "damage", "value": 8 },
+      { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 11 }, { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }] }
+  },
+  {
+    "id": "psi_psychic_drain",
+    "name": "精神汲取",
+    "nameEn": "Psychic Drain",
+    "artPath": "Psion/psi_psychic_drain.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 1,
+    "range": "ranged",
+    "description": "造成 5 点伤害。回复造成伤害 50% 的生命值。消耗 1 层共鸣。",
+    "effects": [
+      { "type": "damage", "value": 5 },
+      { "type": "lifesteal", "percent": 50 },
+      { "type": "consumeResonance", "damagePerStack": 0, "value": 1 }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 7 }, { "type": "lifesteal", "percent": 50 }, { "type": "consumeResonance", "damagePerStack": 0, "value": 1 }] }
+  },
+  {
+    "id": "psi_amp_up",
+    "name": "灵能增幅",
+    "nameEn": "Amp Up",
+    "artPath": "Psion/psi_amp_up.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "common",
+    "cost": 0,
+    "targetType": "Self",
+    "description": "获得 2 层共鸣。",
+    "effects": [
+      { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" }
+    ],
+    "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 3, "target": "self" }] }
+  },
+  {
+    "id": "psi_psychic_bolt",
+    "name": "精神飞弹",
+    "nameEn": "Psychic Bolt",
+    "artPath": "Psion/psi_psychic_bolt.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 1,
+    "range": "ranged",
+    "description": "造成 4 点伤害 2 次（随机敌人）。",
+    "effects": [
+      { "type": "damage", "value": 4, "times": 2, "target": "randomEnemy" }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 5, "times": 2, "target": "randomEnemy" }] }
+  },
+  {
+    "id": "psi_mind_tap",
+    "name": "心灵探针",
+    "nameEn": "Mind Tap",
+    "artPath": "Psion/psi_mind_tap.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "common",
+    "cost": 1,
+    "description": "抽 2 张牌。获得 1 层共鸣。",
+    "effects": [
+      { "type": "draw", "value": 2 },
+      { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }
+    ],
+    "upgrade": { "effects": [{ "type": "draw", "value": 3 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }] }
+  },
+  {
+    "id": "psi_reality_fray",
+    "name": "现实裂纹",
+    "nameEn": "Reality Fray",
+    "artPath": "Psion/psi_reality_fray.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 2,
+    "range": "ranged",
+    "description": "造成 8 点伤害。若目标被标记，改为造成 14 点伤害。消耗 1 层共鸣。",
+    "effects": [
+      { "type": "conditionalDamage", "baseDamage": 8, "bonusDamage": 14, "condition": "targetMarked" },
+      { "type": "consumeResonance", "damagePerStack": 0, "value": 1 }
+    ],
+    "upgrade": { "effects": [{ "type": "conditionalDamage", "baseDamage": 10, "bonusDamage": 18, "condition": "targetMarked" }, { "type": "consumeResonance", "damagePerStack": 0, "value": 1 }] }
+  },
+  {
+    "id": "psi_overload_beam",
+    "name": "过载光束",
+    "nameEn": "Overload Beam",
+    "artPath": "Psion/psi_overload_beam.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 1,
+    "range": "ranged",
+    "description": "造成 5 点伤害。消耗所有共鸣，每层额外造成 2 点伤害。",
+    "effects": [
+      { "type": "damage", "value": 5 },
+      { "type": "consumeResonance", "damagePerStack": 2 }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 7 }, { "type": "consumeResonance", "damagePerStack": 3 }] }
+  },
+  {
+    "id": "psi_resonance_wave",
+    "name": "共鸣波",
+    "nameEn": "Resonance Wave",
+    "artPath": "Psion/psi_resonance_wave.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 2,
+    "range": "ranged",
+    "targetType": "AllEnemies",
+    "description": "对所有敌人造成 5 点伤害。消耗所有共鸣，每层额外造成 1 点伤害。",
+    "effects": [
+      { "type": "damage", "value": 5, "target": "allEnemies" },
+      { "type": "consumeResonance", "damagePerStack": 1, "target": "allEnemies" }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 7, "target": "allEnemies" }, { "type": "consumeResonance", "damagePerStack": 2, "target": "allEnemies" }] }
+  },
+  {
+    "id": "psi_neural_blast",
+    "name": "神经爆发",
+    "nameEn": "Neural Blast",
+    "artPath": "Psion/psi_neural_blast.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 2,
+    "range": "ranged",
+    "description": "造成 10 点伤害。若共鸣 >= 5，施加 2 层易伤。",
+    "effects": [
+      { "type": "damage", "value": 10 },
+      { "type": "conditionalStatus", "condition": "resonance>=5", "statusId": "Vulnerable", "value": 2 }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 14 }, { "type": "conditionalStatus", "condition": "resonance>=5", "statusId": "Vulnerable", "value": 2 }] }
+  },
+  {
+    "id": "psi_psychic_wall",
+    "name": "灵能壁垒",
+    "nameEn": "Psychic Wall",
+    "artPath": "Psion/psi_psychic_wall.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "uncommon",
+    "cost": 2,
+    "targetType": "Self",
+    "description": "获得 10 点护甲。每层共鸣额外获得 2 点护甲。消耗 1 层共鸣。",
+    "effects": [
+      { "type": "block", "value": 10 },
+      { "type": "blockPerResonance", "value": 2 },
+      { "type": "consumeResonance", "damagePerStack": 0, "value": 1 }
+    ],
+    "upgrade": { "effects": [{ "type": "block", "value": 14 }, { "type": "blockPerResonance", "value": 2 }, { "type": "consumeResonance", "damagePerStack": 0, "value": 1 }] }
+  },
+  {
+    "id": "psi_frontline_discipline",
+    "name": "前线修炼",
+    "nameEn": "Frontline Discipline",
+    "artPath": "Psion/psi_frontline_discipline.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "uncommon",
+    "cost": 1,
+    "targetType": "Self",
+    "description": "【前排】获得 3 层共鸣和 6 点护甲。\n【后排】获得 2 层共鸣，抽 1 张牌。",
+    "frontEffects": [
+      { "type": "applyStatus", "statusId": "Resonance", "value": 3, "target": "self" },
+      { "type": "block", "value": 6 }
+    ],
+    "backEffects": [
+      { "type": "applyStatus", "statusId": "Resonance", "value": 2, "target": "self" },
+      { "type": "draw", "value": 1 }
+    ],
+    "upgrade": {
+      "effects": [
+        { "type": "applyStatus", "statusId": "Resonance", "value": 4, "target": "self" },
+        { "type": "block", "value": 8 }
+      ]
+    }
+  },
+  {
+    "id": "psi_psionic_reload",
+    "name": "灵能装填",
+    "nameEn": "Psionic Reload",
+    "artPath": "Psion/psi_psionic_reload.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "uncommon",
+    "cost": 1,
+    "description": "从弃牌堆中将 1 张攻击牌加入手牌。获得 1 层共鸣。",
+    "effects": [
+      { "type": "retrieveFromDiscard", "cardType": "Attack", "value": 1 },
+      { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }
+    ],
+    "upgrade": { "effects": [{ "type": "retrieveFromDiscard", "cardType": "Attack", "value": 2 }, { "type": "applyStatus", "statusId": "Resonance", "value": 1, "target": "self" }] }
+  },
+  {
+    "id": "psi_resonance_engine",
+    "name": "共鸣引擎",
+    "nameEn": "Resonance Engine",
+    "artPath": "Psion/psi_resonance_engine.svg",
+    "class": "psion",
+    "type": "power",
+    "rarity": "rare",
+    "cost": 2,
+    "description": "永久效果：每回合开始时获得 1 层共鸣。共鸣 >= 5 时，攻击牌伤害 +3。",
+    "effects": [
+      { "type": "applyPower", "powerId": "ResonanceEngine", "value": 1 }
+    ],
+    "upgrade": { "effects": [{ "type": "applyPower", "powerId": "ResonanceEngine", "value": 2 }] }
+  },
+  {
+    "id": "psi_psionic_dominator",
+    "name": "灵能支配者",
+    "nameEn": "Psionic Dominator",
+    "artPath": "Psion/psi_psionic_dominator.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "rare",
+    "cost": 3,
+    "range": "ranged",
+    "exhaust": true,
+    "description": "消耗。造成 18 点伤害。若目标被标记，控制该敌人攻击其盟友 1 回合（伤害 = 目标攻击力 50%）。消耗标记。",
+    "effects": [
+      { "type": "damage", "value": 18 },
+      { "type": "dominateMarked", "percent": 50 }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 24 }, { "type": "dominateMarked", "percent": 75 }] }
+  },
+  {
+    "id": "psi_void_reckoning",
+    "name": "虚空清算",
+    "nameEn": "Void Reckoning",
+    "artPath": "Psion/psi_void_reckoning.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "rare",
+    "cost": 3,
+    "range": "ranged",
+    "description": "造成 共鸣层数 x 6 点伤害。消耗所有共鸣。",
+    "effects": [
+      { "type": "resonanceDamage", "multiplier": 6 },
+      { "type": "clearResonance" }
+    ],
+    "upgrade": { "effects": [{ "type": "resonanceDamage", "multiplier": 8 }, { "type": "clearResonance" }] }
+  },
+  {
+    "id": "psi_psionic_surge",
+    "name": "灵能涌潮",
+    "nameEn": "Psionic Surge",
+    "artPath": "Psion/psi_psionic_surge.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "rare",
+    "cost": 2,
+    "targetType": "Self",
+    "description": "获得 4 层共鸣。本回合下一张攻击牌消耗共鸣时，每层额外 +2 伤害。",
+    "effects": [
+      { "type": "applyStatus", "statusId": "Resonance", "value": 4, "target": "self" },
+      { "type": "resonanceAmplify", "value": 2 }
+    ],
+    "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "Resonance", "value": 6, "target": "self" }, { "type": "resonanceAmplify", "value": 3 }] }
+  },
+  {
+    "id": "psi_frontline_apotheosis",
+    "name": "前线蜕变",
+    "nameEn": "Frontline Apotheosis",
+    "artPath": "Psion/psi_frontline_apotheosis.svg",
+    "class": "psion",
+    "type": "skill",
+    "rarity": "rare",
+    "cost": 2,
+    "exhaust": true,
+    "description": "消耗。切换至前排。获得 10 点护甲。获得 5 层共鸣。本回合近战牌伤害 +8。",
+    "effects": [
+      { "type": "switchToFront" },
+      { "type": "block", "value": 10 },
+      { "type": "applyStatus", "statusId": "Resonance", "value": 5, "target": "self" },
+      { "type": "applyStatus", "statusId": "MeleeStrength", "value": 8, "target": "self", "duration": 1 }
+    ],
+    "upgrade": { "effects": [{ "type": "switchToFront" }, { "type": "block", "value": 14 }, { "type": "applyStatus", "statusId": "Resonance", "value": 7, "target": "self" }, { "type": "applyStatus", "statusId": "MeleeStrength", "value": 10, "target": "self", "duration": 1 }] }
+  },
+  {
+    "id": "psi_transcendent_psion",
+    "name": "超灵者",
+    "nameEn": "Transcendent Psion",
+    "artPath": "Psion/psi_transcendent_psion.svg",
+    "class": "psion",
+    "type": "power",
+    "rarity": "rare",
+    "cost": 3,
+    "exhaust": true,
+    "description": "永久效果：每层共鸣同时使攻击牌伤害 +1（不消耗共鸣）。消耗共鸣时不再减少，而是每回合末减少 2 层。",
+    "effects": [
+      { "type": "applyPower", "powerId": "TranscendentPsion" }
+    ],
+    "upgrade": { "effects": [{ "type": "applyPower", "powerId": "TranscendentPsion" }] }
+  },
+  {
+    "id": "psi_psionic_storm",
+    "name": "灵能风暴·天罚",
+    "nameEn": "Psionic Storm",
+    "artPath": "Psion/psi_psionic_storm.svg",
+    "class": "psion",
+    "type": "attack",
+    "rarity": "rare",
+    "cost": 4,
+    "range": "ranged",
+    "targetType": "AllEnemies",
+    "exhaust": true,
+    "description": "消耗。对所有敌人造成 15 点伤害。消耗所有共鸣，每层额外造成 3 点伤害。施加 1 层虚弱。",
+    "effects": [
+      { "type": "damage", "value": 15, "target": "allEnemies" },
+      { "type": "consumeResonance", "damagePerStack": 3, "target": "allEnemies" },
+      { "type": "applyStatus", "statusId": "Weak", "value": 1, "target": "allEnemies" }
+    ],
+    "upgrade": { "effects": [{ "type": "damage", "value": 20, "target": "allEnemies" }, { "type": "consumeResonance", "damagePerStack": 4, "target": "allEnemies" }, { "type": "applyStatus", "statusId": "Weak", "value": 2, "target": "allEnemies" }] }
+  },
+  {
+    "id": "psi_mind_sovereign",
+    "name": "心灵主宰",
+    "nameEn": "Mind Sovereign",
+    "artPath": "Psion/psi_mind_sovereign.svg",
+    "class": "psion",
+    "type": "power",
+    "rarity": "rare",
+    "cost": 3,
+    "exhaust": true,
+    "description": "永久效果：每回合开始自动标记所有敌人 1 回合。攻击被标记敌人时，费用 -1（每回合限 2 次）。击杀被标记敌人回复 3 点生命。",
+    "effects": [
+      { "type": "applyPower", "powerId": "MindSovereign" }
+    ],
+    "upgrade": { "effects": [{ "type": "applyPower", "powerId": "MindSovereign" }] }
   }
 ]
+
+
+

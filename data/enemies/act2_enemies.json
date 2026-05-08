@@ -66,7 +66,7 @@
     "isElite": false,
     "isBoss": false,
     "intentPatterns": [
-      { "type": "debuff", "value": 2, "scope": "singleAny",  "weight": 2.0, "description": "精神侵蚀 (易伤2)" },
+      { "type": "debuff", "value": 2, "scope": "singleAny",  "weight": 2.0, "statusId": "Vulnerable", "description": "精神侵蚀 (易伤2)" },
       { "type": "attack", "value": 10,"scope": "singleAny",  "weight": 2.0, "description": "念力打击 10" },
       { "type": "buff",   "value": 1, "scope": "allEnemies", "weight": 1.5, "description": "灵能增幅 (全体力量+1)" },
       { "type": "defend", "value": 6, "scope": "self",       "weight": 0.5, "description": "相位闪避 6" }

@@ -18,7 +18,7 @@
           { "type": "attack",  "value": 16, "scope": "singleAny",  "weight": 2.0, "description": "光矛 16" },
           { "type": "attack",  "value": 10, "scope": "all",        "weight": 1.5, "description": "能量波 10 (全体)" },
           { "type": "defend",  "value": 25, "scope": "self",       "weight": 1.5, "description": "绝对防御 25" },
-          { "type": "summon",  "value": 2,  "scope": "self",       "weight": 1.0, "description": "召唤守卫构造体×2" },
+          { "type": "summon",  "value": 2,  "scope": "self",       "weight": 1.0, "summonId": "guardian_construct", "description": "召唤守卫构造体×2" },
           { "type": "debuff",  "value": 1,  "scope": "all",        "weight": 1.0, "description": "压迫力场 (全体虚弱1)" }
         ]
       },
@@ -29,7 +29,7 @@
           { "type": "attack",  "value": 24, "scope": "singleAny",  "weight": 2.0, "description": "毁灭光束 24" },
           { "type": "attack",  "value": 15, "scope": "all",        "weight": 2.0, "description": "星碎 15 (全体)" },
           { "type": "buff",    "value": 3,  "scope": "self",       "weight": 1.0, "description": "破坏增幅 (力量+3)" },
-          { "type": "debuff",  "value": 2,  "scope": "allFront",   "weight": 1.0, "description": "防线瓦解 (前排易伤2)" }
+          { "type": "debuff",  "value": 2,  "scope": "allFront",   "weight": 1.0, "statusId": "Vulnerable", "description": "防线瓦解 (前排易伤2)" }
         ]
       },
       {

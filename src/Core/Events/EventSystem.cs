@@ -18,12 +18,16 @@ public enum EventChoiceEffect
     GainCard,
     RemoveCard,
     GainPotion,
+    LosePotion,
     UpgradeCard,
     GainImplant,
     GainRelic,
     GainParts,
     StartCombat,
-    Nothing
+    Nothing,
+    HealPercent,
+    LoseGoldAll,
+    LoseHpPercent
 }
 
 /// <summary>
@@ -42,7 +46,7 @@ public sealed class EventChoice
 public sealed class EventChoiceOutcome
 {
     public required EventChoiceEffect Effect { get; init; }
-    public int Value { get; init; }
+    public double Value { get; init; }
     public string? TargetId { get; init; }
     public float Probability { get; init; } = 1.0f;
     public string? FlavorText { get; init; }
@@ -69,14 +73,15 @@ public sealed class EventData
 public class EventSystem
 {
     private readonly SeededRandom _random;
-    private readonly HashSet<string> _seenOneTimeEvents = [];
+    private readonly HashSet<string> _seenOneTimeEvents;
 
     public event Action<EventData>? OnEventStarted;
     public event Action<EventChoice, List<EventChoiceOutcome>>? OnChoiceMade;
 
-    public EventSystem(SeededRandom random)
+    public EventSystem(SeededRandom random, HashSet<string>? seenOneTimeEvents = null)
     {
         _random = random;
+        _seenOneTimeEvents = seenOneTimeEvents ?? [];
     }
 
     /// <summary>

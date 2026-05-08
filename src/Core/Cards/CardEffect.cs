@@ -3,6 +3,7 @@ using RogueCardGame.Core.Characters;
 using RogueCardGame.Core.Combat.Actions;
 using RogueCardGame.Core.Combat.Powers;
 using RogueCardGame.Core.Deck;
+using RogueCardGame.Core.Utils;
 
 namespace RogueCardGame.Core.Combat;
 
@@ -33,10 +34,14 @@ public sealed class CardEffectContext
     public DeckManager? Deck { get; init; }
     /// <summary>Card database (for creating new card instances).</summary>
     public CardDatabase? CardDb { get; init; }
-    /// <summary>Callback invoked when an effect wants to draw cards (resolved by CombatManager).</summary>
-    public Action<int>? DrawCardCallback { get; init; }
-    /// <summary>Callback to add a card by ID to the discard pile.</summary>
-    public Action<string>? AddToDiscardCallback { get; init; }
+    public Func<string, int>? ImplantBonusProvider { get; init; }
+    public int LastDamageDealt { get; set; }
+    public int TotalDamageDealtThisCard { get; set; }
+    public int LastSelfHpLoss { get; set; }
+    public int TotalSelfHpLossThisCard { get; set; }
+    public bool ConsumedOverchargeThisTurn { get; set; }
+    /// <summary>All living enemies on the field (for "per poisoned enemy on field" type effects).</summary>
+    public List<Combatant>? AllEnemies { get; init; }
 }
 
 /// <summary>
@@ -88,22 +93,32 @@ public class RowConditionalEffect : ICardEffect
 }
 
 /// <summary>
-/// Wrapper that overrides the context to target self (Source) regardless of the card's target type.
-/// Used for per-effect targeting when an individual effect has "target": "self" in JSON.
+/// Wrapper that overrides the context to target a selector-chosen set regardless of the card's target type.
+/// Used for per-effect targeting when an individual effect has "target": "self"/"allEnemies"/... in JSON.
 /// </summary>
 public class SelfTargetWrapper : ICardEffect
 {
     private readonly ICardEffect _inner;
+    private readonly TargetSelector _selector;
 
-    public SelfTargetWrapper(ICardEffect inner) => _inner = inner;
+    public SelfTargetWrapper(ICardEffect inner) : this(inner, TargetSelector.Self) { }
+
+    public SelfTargetWrapper(ICardEffect inner, TargetSelector selector)
+    {
+        _inner = inner;
+        _selector = selector;
+    }
 
     public void Execute(CardEffectContext context)
     {
+        var resolved = _selector.Select(context);
+        if (resolved.Count == 0) return;
+        var first = resolved[0];
         var selfContext = new CardEffectContext
         {
             Source = context.Source,
-            Target = context.Source,
-            AllTargets = [context.Source],
+            Target = first,
+            AllTargets = resolved,
             Formation = context.Formation,
             Aggro = context.Aggro,
             Card = context.Card,
@@ -111,10 +126,17 @@ public class SelfTargetWrapper : ICardEffect
             Actions = context.Actions,
             Deck = context.Deck,
             CardDb = context.CardDb,
-            DrawCardCallback = context.DrawCardCallback,
-            AddToDiscardCallback = context.AddToDiscardCallback
+            ImplantBonusProvider = context.ImplantBonusProvider,
+            LastDamageDealt = context.LastDamageDealt,
+            TotalDamageDealtThisCard = context.TotalDamageDealtThisCard,
+            LastSelfHpLoss = context.LastSelfHpLoss,
+            TotalSelfHpLossThisCard = context.TotalSelfHpLossThisCard
         };
         _inner.Execute(selfContext);
+        context.LastDamageDealt = selfContext.LastDamageDealt;
+        context.TotalDamageDealtThisCard = selfContext.TotalDamageDealtThisCard;
+        context.LastSelfHpLoss = selfContext.LastSelfHpLoss;
+        context.TotalSelfHpLossThisCard = selfContext.TotalSelfHpLossThisCard;
     }
 
     public string GetDescription(CardEffectContext? context = null) =>
@@ -181,7 +203,7 @@ public class GainBlockEffect : ICardEffect
 }
 
 /// <summary>
-/// Draw cards from deck.
+/// Draw cards from deck. Enqueues DrawCardAction so draw happens after current effect chain.
 /// </summary>
 public class DrawCardsEffect : ICardEffect
 {
@@ -191,7 +213,11 @@ public class DrawCardsEffect : ICardEffect
 
     public void Execute(CardEffectContext context)
     {
-        context.DrawCardCallback?.Invoke(Count);
+        if (context.Actions != null && context.Deck != null && context.Source is PlayerCharacter player)
+        {
+            context.Actions.AddToBottom(new DrawCardAction(player, Count, context.Deck));
+        }
+        // else: no action queue available (unit tests) — silently no-op.
     }
 
     public string GetDescription(CardEffectContext? context = null) =>
@@ -221,7 +247,7 @@ public class ApplyStatusEffect : ICardEffect
             if (context.Actions != null)
             {
                 var power = PowerFactory.CreateFromStatusType(StatusType, Stacks);
-                context.Actions.AddToBottom(new ApplyPowerAction(target, power));
+                context.Actions.AddToBottom(new ApplyPowerAction(target, power, context.Source));
             }
             else
             {
@@ -430,7 +456,8 @@ public class AddToDiscardEffect : ICardEffect
 
     public void Execute(CardEffectContext context)
     {
-        context.AddToDiscardCallback?.Invoke(CardId);
+        if (context.Actions != null && context.Source is PlayerCharacter player)
+            context.Actions.AddToBottom(new AddCardToDiscardAction(player, CardId, context.CardDb, context.Deck));
     }
 
     public string GetDescription(CardEffectContext? context = null) =>
@@ -445,9 +472,9 @@ public class AddToDiscardEffect : ICardEffect
 public class ResonanceDamageEffect : ICardEffect
 {
     public int BaseDamage { get; }
-    public int Multiplier { get; }
+    public double Multiplier { get; }
 
-    public ResonanceDamageEffect(int baseDamage, int multiplier = 1)
+    public ResonanceDamageEffect(int baseDamage, double multiplier = 1)
     {
         BaseDamage = baseDamage;
         Multiplier = multiplier;
@@ -456,7 +483,7 @@ public class ResonanceDamageEffect : ICardEffect
     public void Execute(CardEffectContext context)
     {
         int resonance = context.Source.Powers.GetStacks(CommonPowerIds.Resonance);
-        int totalDamage = BaseDamage + resonance * Multiplier;
+        int totalDamage = BaseDamage + (int)(resonance * Multiplier);
         if (context.Actions != null)
             context.Actions.AddToBottom(new DealDamageAction(
                 context.Source, context.AllTargets, totalDamage,
@@ -475,13 +502,13 @@ public class ResonanceDamageEffect : ICardEffect
 /// <summary>Gain block = Resonance stacks × multiplier.</summary>
 public class ResonanceBlockEffect : ICardEffect
 {
-    public int Multiplier { get; }
-    public ResonanceBlockEffect(int multiplier) => Multiplier = multiplier;
+    public double Multiplier { get; }
+    public ResonanceBlockEffect(double multiplier) => Multiplier = multiplier;
 
     public void Execute(CardEffectContext context)
     {
         int resonance = context.Source.Powers.GetStacks(CommonPowerIds.Resonance);
-        int block = resonance * Multiplier;
+        int block = (int)(resonance * Multiplier);
         if (block > 0 && context.Actions != null)
             context.Actions.AddToBottom(new GainBlockAction(context.Source, block, context.Formation));
     }
@@ -505,6 +532,7 @@ public class ConsumeResonanceEffect : ICardEffect
         if (stacks > 0)
         {
             int damage = stacks * DamagePerStack;
+            damage = (int)context.Source.Powers.ModifyConsumeResonanceDamage(damage, stacks);
             context.Source.Powers.RemovePower(CommonPowerIds.Resonance);
             if (context.Actions != null)
                 context.Actions.AddToBottom(new DealDamageAction(
@@ -537,7 +565,7 @@ public class ClearResonanceEffect : ICardEffect
     public string GetDescription(CardEffectContext? context = null) => "共鸣归零";
 }
 
-/// <summary>Delayed resonance: gain stacks at next turn start. Simplified: just apply now.</summary>
+/// <summary>Delayed resonance: gain stacks at the START of next turn via GainResonanceNextTurnPower trigger.</summary>
 public class DelayedResonanceEffect : ICardEffect
 {
     public int Amount { get; }
@@ -545,8 +573,8 @@ public class DelayedResonanceEffect : ICardEffect
 
     public void Execute(CardEffectContext context)
     {
-        // Simplified: apply resonance immediately (a full implementation would use a trigger power)
-        var power = new ResonancePower { Amount = Amount };
+        // Apply a trigger power that fires at the START of the next turn, converting to Resonance.
+        var power = new GainResonanceNextTurnPower { Amount = Amount };
         context.Actions?.AddToBottom(new ApplyPowerAction(context.Source, power));
     }
 
@@ -577,15 +605,8 @@ public class ConditionalDamageEffect : ICardEffect
             context.Range, context.Formation, context.Aggro));
     }
 
-    private bool EvaluateCondition(CardEffectContext context)
-    {
-        if (Condition.StartsWith("resonance>="))
-        {
-            int threshold = int.Parse(Condition["resonance>=".Length..]);
-            return context.Source.Powers.GetStacks(CommonPowerIds.Resonance) >= threshold;
-        }
-        return false;
-    }
+    private bool EvaluateCondition(CardEffectContext context) =>
+        ConditionEvaluator.Evaluate(Condition, context);
 
     public string GetDescription(CardEffectContext? context = null) =>
         $"造成 {BaseDamage} 伤害 (条件满足: {BonusDamage})";
@@ -600,7 +621,15 @@ public class ScryEffect : ICardEffect
     public void Execute(CardEffectContext context)
     {
         // Simplified: just draw cards (full scry UI would need modal)
-        context.DrawCardCallback?.Invoke(Count > 2 ? 1 : Count);
+        int drawCount = Count > 2 ? 1 : Count;
+        TryDraw(context, drawCount);
+    }
+
+    internal static void TryDraw(CardEffectContext context, int count)
+    {
+        if (count <= 0) return;
+        if (context.Actions != null && context.Deck != null && context.Source is PlayerCharacter player)
+            context.Actions.AddToBottom(new DrawCardAction(player, count, context.Deck));
     }
     public string GetDescription(CardEffectContext? context = null) =>
         $"查看抽牌堆顶 {Count} 张牌";
@@ -625,10 +654,22 @@ public class ApplyPowerByIdEffect : ICardEffect
             "ResonanceCascade" => new ResonanceCascadePower { Amount = Amount },
             "NeuralNetwork" => new NeuralNetworkPower { Amount = Amount },
             "ApexPredator" => new ApexPredatorPower { Amount = Amount },
+            "FrontlineCommander" => new FrontlineCommanderPower { Amount = Amount > 0 ? Amount : 1 },
+            "WarMachine" => new WarMachinePower { Amount = Amount > 0 ? Amount : 1 },
+            "ResonanceEngine" => new ResonanceEnginePower { Amount = Amount > 0 ? Amount : 1 },
+            "TranscendentPsion" => new TranscendentPsionPower { Amount = 1 },
+            "MindSovereign" => new MindSovereignPower { Amount = 1 },
+            "PassiveScan" => new PassiveScanPower { Amount = 1 },
+            "Firewall" => new FirewallAbilityPower { Amount = 1 },
+            "PersistentLink" => new PersistentLinkPower { Amount = 1 },
+            "TacticalErosion" => new TacticalErosionPower { Amount = 1 },
+            "BloodRitual" => new BloodRitualPower { Amount = 1 },
             _ => null
         };
         if (power != null)
             context.Actions?.AddToBottom(new ApplyPowerAction(context.Source, power));
+        else
+            EffectLog.Warn($"[ApplyPowerByIdEffect] Unknown PowerId: \"{PowerIdStr}\"");
     }
 
     public string GetDescription(CardEffectContext? context = null) =>
@@ -662,9 +703,14 @@ public class HackEffect : ICardEffect
 
     public void Execute(CardEffectContext context)
     {
+        int speedBonus = context.ImplantBonusProvider?.Invoke("hackSpeedBonus") ?? 0;
+        int finalAmount = speedBonus == 0
+            ? Amount
+            : Amount + (int)MathF.Ceiling(Amount * speedBonus / 100f);
+
         foreach (var target in context.AllTargets)
         {
-            var power = new HackedPower { Amount = Amount };
+            var power = new HackedPower { Amount = finalAmount };
             context.Actions?.AddToBottom(new ApplyPowerAction(target, power));
         }
     }
@@ -733,7 +779,11 @@ public class DoubleProtocolEffect : ICardEffect
     public void Execute(CardEffectContext context)
     {
         var power = context.Source.Powers.GetPower(CommonPowerIds.ProtocolStack);
-        if (power != null)
+        if (power is ProtocolStackPower protocolPower)
+        {
+            power.Amount = Math.Min(power.Amount * 2, Math.Min(Cap, protocolPower.MaxStacks));
+        }
+        else if (power != null)
         {
             power.Amount = Math.Min(power.Amount * 2, Cap);
         }
@@ -764,7 +814,9 @@ public class InstantHackEffect : ICardEffect
 //  SYMBIOTE: SELF-DAMAGE / LIFESTEAL EFFECTS
 // =====================================================================
 
-/// <summary>Lose HP (flat amount).</summary>
+/// <summary>
+/// Lose HP (flat amount). Bypasses block, cannot kill. Enqueues SelfDamageAction.
+/// </summary>
 public class SelfDamageEffect : ICardEffect
 {
     public int Amount { get; }
@@ -772,13 +824,22 @@ public class SelfDamageEffect : ICardEffect
 
     public void Execute(CardEffectContext context)
     {
-        context.Source.CurrentHp = Math.Max(1, context.Source.CurrentHp - Amount);
+        int loss = Amount;
+        if ((context.ImplantBonusProvider?.Invoke("erosionSelfDamageHalf") ?? 0) > 0)
+            loss = Math.Max(1, loss / 2);
+
+        if (context.Actions != null)
+            context.Actions.AddToBottom(new SelfDamageAction(context.Source, loss));
+        else
+            context.Source.CurrentHp = Math.Max(1, context.Source.CurrentHp - loss);
     }
     public string GetDescription(CardEffectContext? context = null) =>
         $"失去 {Amount} HP";
 }
 
-/// <summary>Lose HP equal to a percentage of current HP.</summary>
+/// <summary>
+/// Lose HP equal to a percentage of current HP. Enqueues SelfDamageAction.
+/// </summary>
 public class SelfDamagePercentEffect : ICardEffect
 {
     public int Percent { get; }
@@ -787,7 +848,15 @@ public class SelfDamagePercentEffect : ICardEffect
     public void Execute(CardEffectContext context)
     {
         int loss = context.Source.CurrentHp * Percent / 100;
-        context.Source.CurrentHp = Math.Max(1, context.Source.CurrentHp - loss);
+        if (loss <= 0) return;
+
+        if ((context.ImplantBonusProvider?.Invoke("erosionSelfDamageHalf") ?? 0) > 0)
+            loss = Math.Max(1, loss / 2);
+
+        if (context.Actions != null)
+            context.Actions.AddToBottom(new SelfDamageAction(context.Source, loss));
+        else
+            context.Source.CurrentHp = Math.Max(1, context.Source.CurrentHp - loss);
     }
     public string GetDescription(CardEffectContext? context = null) =>
         $"失去当前HP的 {Percent}%";
@@ -801,12 +870,10 @@ public class LifestealEffect : ICardEffect
 
     public void Execute(CardEffectContext context)
     {
-        // Track damage from previous effects in this composite
-        // Simplified: estimate heal from target HP loss
-        int totalDamageEstimate = 0;
-        foreach (var target in context.AllTargets)
-            totalDamageEstimate += Math.Max(0, target.MaxHp - target.CurrentHp);
-        int heal = Math.Max(1, totalDamageEstimate * Percent / 100);
+        int dealt = context.LastDamageDealt;
+        if (dealt <= 0) return;
+
+        int heal = Math.Max(1, dealt * Percent / 100);
         context.Actions?.AddToBottom(new HealAction(context.Source, heal));
     }
     public string GetDescription(CardEffectContext? context = null) =>
@@ -846,12 +913,7 @@ public class ConditionalBlockEffect : ICardEffect
 
     public void Execute(CardEffectContext context)
     {
-        bool condMet = Condition switch
-        {
-            "lostHpThisTurn" => context.Source.CurrentHp < context.Source.MaxHp,
-            _ => false
-        };
-        if (condMet)
+        if (ConditionEvaluator.Evaluate(Condition, context))
             context.Actions?.AddToBottom(new GainBlockAction(context.Source, Amount, context.Formation));
     }
     public string GetDescription(CardEffectContext? context = null) =>
@@ -861,14 +923,18 @@ public class ConditionalBlockEffect : ICardEffect
 /// <summary>Deal damage based on HP lost this card play (for Pandemonium).</summary>
 public class DamageFromHpLostEffect : ICardEffect
 {
-    public int Multiplier { get; }
-    public DamageFromHpLostEffect(int multiplier) => Multiplier = multiplier;
+    public double Multiplier { get; }
+    public DamageFromHpLostEffect(double multiplier) => Multiplier = multiplier;
 
     public void Execute(CardEffectContext context)
     {
-        // Estimate: use the selfDamage that was already applied in this composite
-        int hpLost = context.Source.MaxHp - context.Source.CurrentHp;
-        int damage = Math.Max(1, hpLost * Multiplier / 3); // Approximate since we can't track exact loss
+        int hpLost = context.TotalSelfHpLossThisCard;
+        int damage = Math.Max(1, (int)(hpLost * Multiplier));
+
+        int bonus = context.ImplantBonusProvider?.Invoke("erosionBonusDamage") ?? 0;
+        if (bonus > 0)
+            damage = (int)MathF.Ceiling(damage * (100 + bonus) / 100f);
+
         context.Actions?.AddToBottom(new DealDamageAction(
             context.Source, context.AllTargets, damage,
             context.Range, context.Formation, context.Aggro));
@@ -877,7 +943,7 @@ public class DamageFromHpLostEffect : ICardEffect
         $"造成失去HP×{Multiplier}的伤害";
 }
 
-/// <summary>Convert current HP percentage to max HP.</summary>
+/// <summary>Convert current HP percentage to max HP. Enqueues ModifyMaxHpAction.</summary>
 public class HpToMaxHpEffect : ICardEffect
 {
     public int Percent { get; }
@@ -886,8 +952,19 @@ public class HpToMaxHpEffect : ICardEffect
     public void Execute(CardEffectContext context)
     {
         int gain = context.Source.CurrentHp * Percent / 100;
-        context.Source.CurrentHp -= gain;
-        context.Source.MaxHp += gain;
+        if (gain <= 0) return;
+        if (context.Actions != null)
+        {
+            // First queue: lose current HP (self-damage, bypasses block)
+            context.Actions.AddToBottom(new SelfDamageAction(context.Source, gain));
+            // Then: increase max HP
+            context.Actions.AddToBottom(new ModifyMaxHpAction(context.Source, gain));
+        }
+        else
+        {
+            context.Source.CurrentHp -= gain;
+            context.Source.MaxHp += gain;
+        }
     }
     public string GetDescription(CardEffectContext? context = null) =>
         $"将当前HP的{Percent}%转化为最大HP";
@@ -917,14 +994,447 @@ public class RowConditionalFromDataEffect : ICardEffect
         "根据站位执行不同效果";
 }
 
+// =====================================================================
+//  ADDITIONAL EFFECT TYPES (from new card data)
+// =====================================================================
+
+/// <summary>Gain block equal to Overcharge stacks × perStack.</summary>
+public class BlockPerOverchargeEffect : ICardEffect
+{
+    public int PerStack { get; }
+    public BlockPerOverchargeEffect(int perStack) => PerStack = perStack;
+
+    public void Execute(CardEffectContext context)
+    {
+        int stacks = context.Source.StatusEffects.GetStacks(StatusType.Overcharge);
+        int block = stacks * PerStack;
+        if (block > 0)
+            context.Actions?.AddToBottom(new GainBlockAction(context.Source, block, context.Formation));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"每层超载获得 {PerStack} 点护甲";
+}
+
+/// <summary>Gain block equal to Resonance stacks × perStack.</summary>
+public class BlockPerResonanceEffect : ICardEffect
+{
+    public int PerStack { get; }
+    public BlockPerResonanceEffect(int perStack) => PerStack = perStack;
+
+    public void Execute(CardEffectContext context)
+    {
+        int stacks = context.Source.Powers.GetStacks(CommonPowerIds.Resonance);
+        int block = stacks * PerStack;
+        if (block > 0)
+            context.Actions?.AddToBottom(new GainBlockAction(context.Source, block, context.Formation));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"每层共鸣获得 {PerStack} 点护甲";
+}
+
+/// <summary>Draw cards if a condition is met (e.g., hasOvercharge).</summary>
+public class ConditionalDrawEffect : ICardEffect
+{
+    public string Condition { get; }
+    public int Amount { get; }
+    public ConditionalDrawEffect(string condition, int amount)
+    {
+        Condition = condition;
+        Amount = amount;
+    }
+
+    public void Execute(CardEffectContext context)
+    {
+        bool met = ConditionEvaluator.Evaluate(Condition, context);
+        if (met)
+            ScryEffect.TryDraw(context, Amount);
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"条件满足时抽 {Amount} 张牌";
+}
+
+/// <summary>Gain energy if a condition is met.</summary>
+public class ConditionalEnergyEffect : ICardEffect
+{
+    public string Condition { get; }
+    public int Amount { get; }
+    public ConditionalEnergyEffect(string condition, int amount)
+    {
+        Condition = condition;
+        Amount = amount;
+    }
+
+    public void Execute(CardEffectContext context)
+    {
+        bool met = ConditionEvaluator.Evaluate(Condition, context);
+        if (met && context.Source is PlayerCharacter player)
+            context.Actions?.AddToBottom(new GainEnergyAction(player, Amount));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"条件满足时获得 {Amount} 点能量";
+}
+
+/// <summary>Apply a status effect if a condition is met.</summary>
+public class ConditionalStatusEffect : ICardEffect
+{
+    public string Condition { get; }
+    public StatusType StatusType { get; }
+    public int Amount { get; }
+    public ConditionalStatusEffect(string condition, StatusType statusType, int amount)
+    {
+        Condition = condition;
+        StatusType = statusType;
+        Amount = amount;
+    }
+
+    public void Execute(CardEffectContext context)
+    {
+        bool met = ConditionEvaluator.Evaluate(Condition, context);
+        if (met)
+        {
+            foreach (var target in context.AllTargets)
+            {
+                var power = PowerFactory.CreateFromStatusType(StatusType, Amount);
+                context.Actions?.AddToBottom(new ApplyPowerAction(target, power));
+            }
+        }
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"条件满足时施加 {Amount} 层状态";
+}
+
+/// <summary>Deal damage per debuff on the target.</summary>
+public class DamagePerDebuffEffect : ICardEffect
+{
+    public int DamagePerDebuff { get; }
+    public DamagePerDebuffEffect(int damagePerDebuff) => DamagePerDebuff = damagePerDebuff;
+
+    public void Execute(CardEffectContext context)
+    {
+        foreach (var target in context.AllTargets)
+        {
+            int debuffCount = target.Powers.Powers
+                .Count(p => p.IsDebuff);
+            int damage = debuffCount * DamagePerDebuff;
+            if (damage > 0)
+                context.Actions?.AddToBottom(new DealDamageAction(
+                    context.Source, [target], damage,
+                    context.Range, context.Formation, context.Aggro));
+        }
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"每个负面状态造成 {DamagePerDebuff} 点伤害";
+}
+
+/// <summary>Deal damage per poisoned enemy on the battlefield.</summary>
+public class DamagePerPoisonedEnemyEffect : ICardEffect
+{
+    public int DamagePerPoisoned { get; }
+    public DamagePerPoisonedEnemyEffect(int damagePerPoisoned) => DamagePerPoisoned = damagePerPoisoned;
+
+    public void Execute(CardEffectContext context)
+    {
+        // Count ALL enemies on field (not just targeted ones) — card text: "场上每个中毒的敌人"
+        var enemies = context.AllEnemies ?? context.AllTargets;
+        int poisoned = enemies.Count(t =>
+            t.Powers.GetStacks(CommonPowerIds.Poison) > 0);
+        int damage = poisoned * DamagePerPoisoned;
+        if (damage > 0)
+            context.Actions?.AddToBottom(new DealDamageAction(
+                context.Source, context.AllTargets, damage,
+                context.Range, context.Formation, context.Aggro));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"每个中毒敌人造成 {DamagePerPoisoned} 点伤害";
+}
+
+/// <summary>Dominate a marked enemy — force it to attack its allies.</summary>
+public class DominateMarkedEffect : ICardEffect
+{
+    public int Percent { get; }
+    public DominateMarkedEffect(int percent) => Percent = percent;
+
+    public void Execute(CardEffectContext context)
+    {
+        // Simplified: deal damage to all enemies equal to target's attack * percent
+        // (full implementation would swap target to player side for 1 turn)
+        foreach (var target in context.AllTargets)
+        {
+            // Check if target has any "marked"-like debuff (Vulnerable as proxy)
+            if (target.StatusEffects.GetStacks(StatusType.Vulnerable) > 0)
+            {
+                int dominatedDmg = target.CalculateAttackDamage(0) * Percent / 100;
+                if (dominatedDmg > 0)
+                {
+                    // Target attacks its allies (deal damage to other enemies)
+                    var allies = context.AllTargets.Where(t => t.Id != target.Id).ToList();
+                    if (allies.Count > 0)
+                        context.Actions?.AddToBottom(new DealDamageAction(
+                            target, allies, dominatedDmg,
+                            CardRange.None, context.Formation, context.Aggro));
+                    // Remove the mark
+                    target.StatusEffects.Remove(StatusType.Vulnerable);
+                }
+            }
+        }
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"控制被标记敌人攻击其盟友 ({Percent}% 攻击力)";
+}
+
+/// <summary>Apply hack stacks to target when it acts (simplified: apply immediately as a trap).</summary>
+public class HackOnActionEffect : ICardEffect
+{
+    public int Amount { get; }
+    public HackOnActionEffect(int amount) => Amount = amount;
+
+    public void Execute(CardEffectContext context)
+    {
+        foreach (var target in context.AllTargets)
+        {
+            var power = new HackedPower { Amount = Amount };
+            context.Actions?.AddToBottom(new ApplyPowerAction(target, power));
+        }
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"目标行动时额外施加 {Amount} 层入侵";
+}
+
+/// <summary>Apply hack stacks equal to a percentage of damage dealt.</summary>
+public class HackPercentOfDamageEffect : ICardEffect
+{
+    public int Percent { get; }
+    public HackPercentOfDamageEffect(int percent) => Percent = percent;
+
+    public void Execute(CardEffectContext context)
+    {
+        int dealt = context.LastDamageDealt;
+        int hackStacks = dealt * Percent / 100;
+        if (hackStacks <= 0) return;
+        foreach (var target in context.AllTargets)
+        {
+            var power = new HackedPower { Amount = hackStacks };
+            context.Actions?.AddToBottom(new ApplyPowerAction(target, power));
+        }
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"施加等同于伤害 {Percent}% 的入侵层数";
+}
+
+/// <summary>Heal when you kill an enemy (applied as a power).</summary>
+public class HealOnKillEffect : ICardEffect
+{
+    public int Amount { get; }
+    public HealOnKillEffect(int amount) => Amount = amount;
+
+    public void Execute(CardEffectContext context)
+    {
+        // Apply a persistent power that heals on kill
+        var power = new HealOnKillPower { Amount = Amount };
+        context.Actions?.AddToBottom(new ApplyPowerAction(context.Source, power));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"击杀时回复 {Amount} 点生命";
+}
+
+/// <summary>Heal based on poison damage dealt this turn.</summary>
+public class HealPerPoisonDamageEffect : ICardEffect
+{
+    public int HealPerStack { get; }
+    public HealPerPoisonDamageEffect(int healPerStack) => HealPerStack = healPerStack;
+
+    public void Execute(CardEffectContext context)
+    {
+        // Count poison stacks on all enemies, heal that amount
+        int totalPoison = context.AllTargets.Sum(t =>
+            t.Powers.GetStacks(CommonPowerIds.Poison));
+        int heal = totalPoison * HealPerStack;
+        if (heal > 0)
+            context.Actions?.AddToBottom(new HealAction(context.Source, heal));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"根据毒素层数回复生命 (每层 {HealPerStack})";
+}
+
+/// <summary>Deal damage that ignores block/armor.</summary>
+public class PiercingDamageEffect : ICardEffect
+{
+    public int Damage { get; }
+    public PiercingDamageEffect(int damage) => Damage = damage;
+
+    public void Execute(CardEffectContext context)
+    {
+        foreach (var target in context.AllTargets)
+        {
+            // Direct HP loss, bypasses block
+            int finalDmg = context.Source.CalculateAttackDamage(Damage);
+            float multiplier = context.Formation.GetDamageMultiplier(context.Source.Id, context.Range);
+            finalDmg = (int)(finalDmg * multiplier);
+            target.CurrentHp = Math.Max(0, target.CurrentHp - finalDmg);
+            context.LastDamageDealt = finalDmg;
+        }
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"造成 {Damage} 点无视护甲的伤害";
+}
+
+/// <summary>Remove debuffs from self.</summary>
+public class PurgeDebuffsEffect : ICardEffect
+{
+    public int Count { get; }
+    public PurgeDebuffsEffect(int count) => Count = count;
+
+    public void Execute(CardEffectContext context)
+    {
+        var debuffs = context.Source.Powers.Powers
+            .Where(p => p.IsDebuff)
+            .Take(Count > 0 ? Count : int.MaxValue)
+            .ToList();
+        foreach (var debuff in debuffs)
+            context.Source.Powers.RemovePower(debuff.PowerId);
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        Count > 0 ? $"移除 {Count} 个负面状态" : "移除所有负面状态";
+}
+
+/// <summary>Deal random damage between min and max values.</summary>
+public class RandomDamageEffect : ICardEffect
+{
+    public int MinDamage { get; }
+    public int MaxDamage { get; }
+    private static readonly Random _rng = new();
+
+    public RandomDamageEffect(int minDamage, int maxDamage)
+    {
+        MinDamage = minDamage;
+        MaxDamage = maxDamage;
+    }
+
+    public void Execute(CardEffectContext context)
+    {
+        int damage = _rng.Next(MinDamage, MaxDamage + 1);
+        context.Actions?.AddToBottom(new DealDamageAction(
+            context.Source, context.AllTargets, damage,
+            context.Range, context.Formation, context.Aggro));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"造成 {MinDamage}~{MaxDamage} 点随机伤害";
+}
+
+/// <summary>Amplify next resonance consumption: each stack deals extra bonusPerStack damage.</summary>
+public class ResonanceAmplifyEffect : ICardEffect
+{
+    public int BonusPerStack { get; }
+    public ResonanceAmplifyEffect(int bonusPerStack) => BonusPerStack = bonusPerStack;
+
+    public void Execute(CardEffectContext context)
+    {
+        // Apply a temporary power that boosts the next resonance consume
+        var power = new ResonanceAmplifyPower { Amount = BonusPerStack };
+        context.Actions?.AddToBottom(new ApplyPowerAction(context.Source, power));
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"下次消耗共鸣时每层额外 +{BonusPerStack} 伤害";
+}
+
+/// <summary>Retrieve cards from the discard pile into hand.</summary>
+public class RetrieveFromDiscardEffect : ICardEffect
+{
+    public int Count { get; }
+    public RetrieveFromDiscardEffect(int count) => Count = count;
+
+    public void Execute(CardEffectContext context)
+    {
+        // Simplified: draw cards as proxy (full impl would need discard pile access)
+        ScryEffect.TryDraw(context, Count);
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"从弃牌堆中将 {Count} 张牌加入手牌";
+}
+
+/// <summary>Search the deck for a specific card type.</summary>
+public class SearchDeckEffect : ICardEffect
+{
+    public int Count { get; }
+    public SearchDeckEffect(int count) => Count = count;
+
+    public void Execute(CardEffectContext context)
+    {
+        // Simplified: draw and scry — full impl would need deck search UI
+        ScryEffect.TryDraw(context, Count);
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"搜索牌库，选择 {Count} 张牌加入手牌";
+}
+
+/// <summary>Set HP to a percentage of max HP.</summary>
+public class SetHpPercentEffect : ICardEffect
+{
+    public int Percent { get; }
+    public SetHpPercentEffect(int percent) => Percent = percent;
+
+    public void Execute(CardEffectContext context)
+    {
+        int targetHp = context.Source.MaxHp * Percent / 100;
+        if (targetHp < context.Source.CurrentHp)
+        {
+            int loss = context.Source.CurrentHp - targetHp;
+            context.Actions?.AddToBottom(new SelfDamageAction(context.Source, loss));
+        }
+        else
+        {
+            int heal = targetHp - context.Source.CurrentHp;
+            context.Actions?.AddToBottom(new HealAction(context.Source, heal));
+        }
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"将生命值设为最大值的 {Percent}%";
+}
+
+/// <summary>Switch the caster to the front row.</summary>
+public class SwitchToFrontEffect : ICardEffect
+{
+    public void Execute(CardEffectContext context)
+    {
+        context.Formation.SetPosition(context.Source.Id, FormationRow.Front);
+    }
+    public string GetDescription(CardEffectContext? context = null) =>
+        "切换至前排";
+}
+
 /// <summary>No-op effect for unknown types (logs warning, doesn't crash).</summary>
 public class NoOpEffect : ICardEffect
 {
     private readonly string _type;
     public NoOpEffect(string type) => _type = type;
     public void Execute(CardEffectContext context) =>
-        Godot.GD.PrintErr($"[CardEffect] Unimplemented effect type: {_type}");
+        EffectLog.Warn($"[CardEffect] Unimplemented effect type: {_type}");
     public string GetDescription(CardEffectContext? context = null) => $"[{_type}]";
+}
+
+/// <summary>
+/// Multi-hit effect: executes inner effect multiple times.
+/// Used by cards with "times" field (e.g., "hit 3 times").
+/// </summary>
+public class MultiHitEffect : ICardEffect
+{
+    private readonly ICardEffect _inner;
+    private readonly int _times;
+
+    public MultiHitEffect(ICardEffect inner, int times)
+    {
+        _inner = inner;
+        _times = times;
+    }
+
+    public void Execute(CardEffectContext context)
+    {
+        for (int i = 0; i < _times; i++)
+            _inner.Execute(context);
+    }
+
+    public string GetDescription(CardEffectContext? context = null) =>
+        $"x{_times}: {_inner.GetDescription(context)}";
 }
 
 // =====================================================================
@@ -954,8 +1464,10 @@ public class NeuralNetworkPower : AbstractPower
 
     public override void AtTurnStart()
     {
-        if (Owner != null)
-            ActionManager?.AddToBottom(new ApplyPowerAction(Owner, new ProtocolStackPower { Amount = Amount }));
+        if (Owner is not PlayerCharacter player) return;
+        ActionManager?.AddToBottom(new ApplyPowerAction(player, new ProtocolStackPower { Amount = Amount }));
+        if (ActionManager?.Combat?.PlayerDecks.TryGetValue(player.Id, out var deck) == true)
+            ActionManager.AddToBottom(new DrawCardAction(player, 1, deck));
     }
 }
 
@@ -967,7 +1479,7 @@ public class ApexPredatorPower : AbstractPower
     public override string GetDescription() => $"每失去5HP获得1力量。击杀回复{Amount}HP。";
     private int _hpLostAccumulator;
 
-    public override void OnTakeDamage(int amount)
+    public override void OnTakeDamage(int amount, Combatant? attacker = null)
     {
         _hpLostAccumulator += amount;
         int strengthGain = _hpLostAccumulator / 5;
@@ -990,67 +1502,130 @@ public class ApexPredatorPower : AbstractPower
 /// </summary>
 public static class CardEffectFactory
 {
+    private static readonly Dictionary<string, Func<CardEffectData, ICardEffect>> _registry =
+        new(StringComparer.OrdinalIgnoreCase)
+    {
+        // === Core effects ===
+        ["damage"] = d => new DealDamageEffect(d.Value),
+        ["block"] = d => new GainBlockEffect(d.Value),
+        ["armor"] = d => new GainBlockEffect(d.Value),
+        ["draw"] = d => new DrawCardsEffect(d.Value),
+        ["status"] = d => new ApplyStatusEffect(
+            Enum.Parse<StatusType>(d.StatusId!, true),
+            d.Value,
+            d.SecondaryValue > 0 ? d.SecondaryValue : d.Duration > 0 ? d.Duration : -1),
+        ["applystatus"] = d => new ApplyStatusEffect(
+            Enum.Parse<StatusType>(d.StatusId!, true),
+            d.Value,
+            d.SecondaryValue > 0 ? d.SecondaryValue : d.Duration > 0 ? d.Duration : -1),
+        ["energy"] = d => new GainEnergyEffect(d.Value),
+        ["gainenergy"] = d => new GainEnergyEffect(d.Value),
+        ["loseenergy"] = d => new GainEnergyEffect(-d.Value),
+        ["heal"] = d => new HealEffect(d.Value),
+        ["reposition"] = d => new ForceRepositionEffect(
+            d.Value == 0 ? FormationRow.Front : FormationRow.Back),
+        ["selfreposition"] = d => d.Value switch {
+            0 => new SelfRepositionEffect(FormationRow.Front),
+            1 => new SelfRepositionEffect(FormationRow.Back),
+            _ => new SelfRepositionEffect()
+        },
+        ["dashdamage"] = d => new DashDamageEffect(d.Value, d.SecondaryValue != 0),
+        ["overchargeconsume"] = d => new OverchargeConsumeEffect(d.Value, d.SecondaryValue > 0 ? d.SecondaryValue : 3),
+        ["consumeovercharge"] = d => new OverchargeConsumeEffect(d.Value, d.SecondaryValue > 0 ? d.SecondaryValue : 3),
+        ["addtodiscard"] = d => new AddToDiscardEffect(d.CardId ?? "glitch"),
+
+        // === Psion: Resonance mechanics ===
+        ["resonancedamage"] = d => new ResonanceDamageEffect(d.BaseDamage, d.Multiplier),
+        ["resonanceblock"] = d => new ResonanceBlockEffect(d.Multiplier),
+        ["consumeresonance"] = d => new ConsumeResonanceEffect(d.DamagePerStack),
+        ["halveresonance"] = d => new HalveResonanceEffect(),
+        ["clearresonance"] = d => new ClearResonanceEffect(),
+        ["delayedresonance"] = d => new DelayedResonanceEffect(d.Value),
+        ["conditionaldamage"] = d => new ConditionalDamageEffect(d.BaseDamage, d.BonusDamage, d.Condition ?? ""),
+        ["scry"] = d => new ScryEffect(d.Value),
+        ["applypower"] = d => new ApplyPowerByIdEffect(d.PowerId ?? "", d.Value),
+
+        // === Netrunner: Protocol/Hack mechanics ===
+        ["protocolstack"] = d => new ProtocolStackEffect(d.Value),
+        ["hack"] = d => new HackEffect(d.Value),
+        ["consumeprotocol"] = d => new ConsumeProtocolEffect(d.DamagePerStack),
+        ["protocoldamage"] = d => new ProtocolDamageEffect(d.DamagePerStack, d.Consume),
+        ["doubleprotocol"] = d => new DoubleProtocolEffect(d.Cap > 0 ? d.Cap : 10),
+        ["instanthack"] = d => new InstantHackEffect(d.Duration > 0 ? d.Duration : 1),
+
+        // === Symbiote: Self-damage/lifesteal mechanics ===
+        ["selfdamage"] = d => new SelfDamageEffect(d.Value),
+        ["selfdamagepercent"] = d => new SelfDamagePercentEffect(d.Percent),
+        ["lifesteal"] = d => new LifestealEffect(d.Percent),
+        ["spreadpoison"] = d => new SpreadPoisonEffect(d.Value),
+        ["conditionalblock"] = d => new ConditionalBlockEffect(d.Condition ?? "", d.Value),
+        ["damagefromhplost"] = d => new DamageFromHpLostEffect(d.Multiplier),
+        ["hptomaxhp"] = d => new HpToMaxHpEffect(d.Percent),
+        ["rowconditional"] = d => new RowConditionalFromDataEffect(d.FrontEffect, d.BackEffect),
+
+        // === Additional effect types (from expanded card data) ===
+        ["blockperovercharge"] = d => new BlockPerOverchargeEffect(d.Value > 0 ? d.Value : 1),
+        ["blockperresonance"] = d => new BlockPerResonanceEffect(d.Value > 0 ? d.Value : 1),
+        ["conditionaldraw"] = d => new ConditionalDrawEffect(d.Condition ?? "", d.Value > 0 ? d.Value : 1),
+        ["conditionalenergy"] = d => new ConditionalEnergyEffect(d.Condition ?? "", d.Value > 0 ? d.Value : 1),
+        ["conditionalstatus"] = d => new ConditionalStatusEffect(
+            d.Condition ?? "",
+            Enum.TryParse<StatusType>(d.StatusId ?? "", true, out var cs) ? cs : StatusType.Vulnerable,
+            d.Value > 0 ? d.Value : 1),
+        ["damagedperdebuff"] = d => new DamagePerDebuffEffect(d.Value > 0 ? d.Value : 2),
+        ["damageperdebuff"] = d => new DamagePerDebuffEffect(d.Value > 0 ? d.Value : 2),
+        ["damageperpoisonedenemy"] = d => new DamagePerPoisonedEnemyEffect(d.Value > 0 ? d.Value : 3),
+        ["dominatemarked"] = d => new DominateMarkedEffect(d.Percent > 0 ? d.Percent : 50),
+        ["hackonaction"] = d => new HackOnActionEffect(d.Value > 0 ? d.Value : 3),
+        ["hackpercentofdamage"] = d => new HackPercentOfDamageEffect(d.Percent > 0 ? d.Percent : 50),
+        ["healonkill"] = d => new HealOnKillEffect(d.Value > 0 ? d.Value : 3),
+        ["healperpoisondamage"] = d => new HealPerPoisonDamageEffect(d.Value > 0 ? d.Value : 1),
+        ["piercingdamage"] = d => new PiercingDamageEffect(d.Value),
+        ["purgedebuffs"] = d => new PurgeDebuffsEffect(d.Value),
+        ["randomdamage"] = d => new RandomDamageEffect(d.Value, d.SecondaryValue > 0 ? d.SecondaryValue : d.Value + 5),
+        ["resonanceamplify"] = d => new ResonanceAmplifyEffect(d.Value > 0 ? d.Value : 2),
+        ["retrievefromdiscard"] = d => new RetrieveFromDiscardEffect(d.Value > 0 ? d.Value : 1),
+        ["searchdeck"] = d => new SearchDeckEffect(d.Value > 0 ? d.Value : 1),
+        ["sethppercent"] = d => new SetHpPercentEffect(d.Percent > 0 ? d.Percent : 50),
+        ["switchtofront"] = d => new SwitchToFrontEffect(),
+    };
+
     public static ICardEffect Create(CardEffectData data)
     {
-        ICardEffect inner = data.Type.ToLowerInvariant() switch
+        ICardEffect inner;
+
+        // Route conditional damage: if "damage" type has a condition, use ConditionalDamageEffect
+        var normalizedType = data.Type.ToLowerInvariant();
+        if (normalizedType == "damage" && !string.IsNullOrWhiteSpace(data.Condition))
         {
-            "damage" => new DealDamageEffect(data.Value),
-            "block" or "armor" => new GainBlockEffect(data.Value),
-            "draw" => new DrawCardsEffect(data.Value),
-            "status" or "applystatus" => new ApplyStatusEffect(
-                Enum.Parse<StatusType>(data.StatusId!, true),
-                data.Value,
-                data.SecondaryValue > 0 ? data.SecondaryValue : data.Duration > 0 ? data.Duration : -1),
-            "energy" or "gainenergy" => new GainEnergyEffect(data.Value),
-            "loseenergy" => new GainEnergyEffect(-data.Value),
-            "heal" => new HealEffect(data.Value),
-            "reposition" => new ForceRepositionEffect(
-                data.Value == 0 ? FormationRow.Front : FormationRow.Back),
-            "selfreposition" => data.Value switch {
-                0 => new SelfRepositionEffect(FormationRow.Front),
-                1 => new SelfRepositionEffect(FormationRow.Back),
-                _ => new SelfRepositionEffect()
-            },
-            "dashdamage" => new DashDamageEffect(data.Value, data.SecondaryValue != 0),
-            "overchargeconsume" or "consumeovercharge"
-                => new OverchargeConsumeEffect(data.Value, data.SecondaryValue > 0 ? data.SecondaryValue : 3),
-            "addtodiscard" => new AddToDiscardEffect(data.CardId ?? "glitch"),
+            int bonus = data.BonusDamage;
+            // Support both Multiplier and DamageMultiplier fields from JSON
+            double effectiveMultiplier = data.DamageMultiplier > 1 ? data.DamageMultiplier
+                                       : data.Multiplier > 1 ? data.Multiplier : 1;
+            if (bonus <= 0 && effectiveMultiplier > 1)
+                bonus = (int)(data.Value * effectiveMultiplier);
+            inner = new ConditionalDamageEffect(data.Value, bonus > 0 ? bonus : data.Value, data.Condition);
+        }
+        else if (_registry.TryGetValue(data.Type, out var factory))
+            inner = factory(data);
+        else
+        {
+            EffectLog.Warn($"CardEffectFactory: Unknown effect type \"{data.Type}\"");
+            inner = new NoOpEffect(data.Type);
+        }
 
-            // === Psion: Resonance mechanics ===
-            "resonancedamage" => new ResonanceDamageEffect(data.BaseDamage, data.Multiplier),
-            "resonanceblock" => new ResonanceBlockEffect(data.Multiplier),
-            "consumeresonance" => new ConsumeResonanceEffect(data.DamagePerStack),
-            "halveresonance" => new HalveResonanceEffect(),
-            "clearresonance" => new ClearResonanceEffect(),
-            "delayedresonance" => new DelayedResonanceEffect(data.Value),
-            "conditionaldamage" => new ConditionalDamageEffect(data.BaseDamage, data.BonusDamage, data.Condition ?? ""),
-            "scry" => new ScryEffect(data.Value),
-            "applypower" => new ApplyPowerByIdEffect(data.PowerId ?? "", data.Value),
+        // Wrap with MultiHitEffect if Times > 1
+        if (data.Times > 1)
+            inner = new MultiHitEffect(inner, data.Times);
 
-            // === Netrunner: Protocol/Hack mechanics ===
-            "protocolstack" => new ProtocolStackEffect(data.Value),
-            "hack" => new HackEffect(data.Value),
-            "consumeprotocol" => new ConsumeProtocolEffect(data.DamagePerStack),
-            "protocoldamage" => new ProtocolDamageEffect(data.DamagePerStack, data.Consume),
-            "doubleprotocol" => new DoubleProtocolEffect(data.Cap > 0 ? data.Cap : 10),
-            "instanthack" => new InstantHackEffect(data.Duration > 0 ? data.Duration : 1),
-
-            // === Symbiote: Self-damage/lifesteal mechanics ===
-            "selfdamage" => new SelfDamageEffect(data.Value),
-            "selfdamagepercent" => new SelfDamagePercentEffect(data.Percent),
-            "lifesteal" => new LifestealEffect(data.Percent),
-            "spreadpoison" => new SpreadPoisonEffect(data.Value),
-            "conditionalblock" => new ConditionalBlockEffect(data.Condition ?? "", data.Value),
-            "damagefromhplost" => new DamageFromHpLostEffect(data.Multiplier),
-            "hptomaxhp" => new HpToMaxHpEffect(data.Percent),
-            "rowconditional" => new RowConditionalFromDataEffect(data.FrontEffect, data.BackEffect),
-
-            _ => new NoOpEffect(data.Type)
-        };
-
-        // Wrap with SelfTargetWrapper if the individual effect specifies "target": "self"
-        if (data.Target?.Equals("self", StringComparison.OrdinalIgnoreCase) == true)
-            inner = new SelfTargetWrapper(inner);
+        // Wrap with selector if the individual effect specifies "target": "self"/"allEnemies"/...
+        if (!string.IsNullOrWhiteSpace(data.Target)
+            && !data.Target.Equals("default", StringComparison.OrdinalIgnoreCase))
+        {
+            var selector = TargetSelector.Parse(data.Target);
+            if (selector != TargetSelector.Default)
+                inner = new SelfTargetWrapper(inner, selector);
+        }
 
         return inner;
     }
@@ -1061,5 +1636,120 @@ public static class CardEffectFactory
         foreach (var data in effects)
             composite.Add(Create(data));
         return composite;
+    }
+
+    /// <summary>
+    /// Effect types that intrinsically require at least one enemy target.
+    /// Used by <see cref="CardData.EffectiveTargetType"/> to auto-infer targeting
+    /// when the JSON does not set <c>targetType</c> explicitly.
+    /// </summary>
+    private static readonly HashSet<string> _enemyTargetingEffectTypes =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "damage",
+            "multihit",
+            "multihitdamage",
+            "dashdamage",
+            "piercingdamage",
+            "randomdamage",
+            "conditionaldamage",
+            "damagefromhplost",
+            "damagedperdebuff",
+            "damageperdebuff",
+            "damageperpoisonedenemy",
+            "lifesteal",
+            "hack",
+            "instanthack",
+            "hackonaction",
+            "hackpercentofdamage",
+            "consumeprotocol",
+            "protocoldamage",
+            "consumeresonance",
+            "resonancedamage",
+            "overchargeconsume",
+            "consumeovercharge",
+            "spreadpoison",
+            "dominatemarked",
+            "blockperresonance", // reads from source but effect's block target is self — keep non-enemy
+            "blockperovercharge",
+        };
+
+    /// <summary>Effect types always self-only (self-buff, deck manipulation).</summary>
+    private static readonly HashSet<string> _selfOnlyEffectTypes =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "block", "armor", "draw", "energy", "gainenergy", "loseenergy",
+            "heal", "protocolstack", "overchargegain", "resonance",
+            "resonanceamplify", "resonanceblock", "scry", "addtodiscard",
+            "retrievefromdiscard", "searchdeck", "purgedebuffs",
+            "selfreposition", "switchtofront", "selfdamage", "selfdamagepercent",
+            "doubleprotocol", "halveresonance", "clearresonance",
+            "delayedresonance", "sethppercent", "hptomaxhp", "healonkill",
+            "healperpoisondamage", "conditionaldraw", "conditionalenergy",
+            "conditionalblock",
+        };
+
+    /// <summary>
+    /// Returns true when the effect, given its JSON metadata, requires an enemy target.
+    /// Respects <c>target</c> override ("self"/"allEnemies"/...) and the effect type's
+    /// intrinsic class. Row-conditional effects recurse into their sub-effects.
+    /// </summary>
+    public static bool EffectRequiresEnemyTarget(CardEffectData data)
+    {
+        // Per-effect target override wins first.
+        if (!string.IsNullOrWhiteSpace(data.Target))
+        {
+            var t = data.Target.Trim();
+            if (t.Equals("self", StringComparison.OrdinalIgnoreCase)) return false;
+            if (t.Equals("allallies", StringComparison.OrdinalIgnoreCase)
+                || t.Equals("all_allies", StringComparison.OrdinalIgnoreCase)) return false;
+            if (t.Equals("allenemies", StringComparison.OrdinalIgnoreCase)
+                || t.Equals("all_enemies", StringComparison.OrdinalIgnoreCase)
+                || t.Equals("randomenemy", StringComparison.OrdinalIgnoreCase)
+                || t.Equals("random_enemy", StringComparison.OrdinalIgnoreCase))
+                return false; // scope is AOE/random — no manual selection needed
+        }
+
+        var normalized = (data.Type ?? string.Empty).ToLowerInvariant();
+
+        if (_selfOnlyEffectTypes.Contains(normalized))
+            return false;
+
+        if (_enemyTargetingEffectTypes.Contains(normalized))
+            return true;
+
+        // Row-conditional: defer to sub-effects.
+        if (normalized == "rowconditional")
+        {
+            bool a = data.FrontEffect != null && EffectRequiresEnemyTarget(data.FrontEffect);
+            bool b = data.BackEffect != null && EffectRequiresEnemyTarget(data.BackEffect);
+            return a || b;
+        }
+
+        // applyStatus / status: debuff status types land on enemies; buffs on self.
+        if (normalized is "status" or "applystatus")
+        {
+            if (Enum.TryParse<StatusType>(data.StatusId, true, out var st))
+            {
+                return st is StatusType.Vulnerable
+                    or StatusType.Weak
+                    or StatusType.Frail
+                    or StatusType.Poison
+                    or StatusType.Stunned
+                    or StatusType.Hacked
+                    or StatusType.Mark
+                    or StatusType.ParasiticBond
+                    or StatusType.Rootkit
+                    or StatusType.Rooted;
+            }
+            // unknown status — conservative default: no target selection required.
+            return false;
+        }
+
+        // applyPower: buff/debuff depends on PowerId; we can't always tell, so default to self-target.
+        if (normalized == "applypower") return false;
+
+        // Unknown/new effect type — default to non-targeting (safer: don't force target picking).
+        return false;
     }
 }

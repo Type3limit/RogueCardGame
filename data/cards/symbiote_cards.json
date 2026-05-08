@@ -3,48 +3,61 @@
     "id": "bio_strike",
     "name": "生物打击",
     "nameEn": "Bio Strike",
-    "class": "Symbiote",
-    "type": "Attack",
-    "rarity": "Starter",
+    "artPath": "Symbiote/bio_strike.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "starter",
     "cost": 1,
-    "range": "Melee",
+    "range": "melee",
     "description": "造成 7 伤害。失去 2 HP（侵蚀）。",
     "effects": [{ "type": "damage", "value": 7 }, { "type": "selfDamage", "value": 2 }],
-    "upgrade": { "effects": [{ "type": "damage", "value": 10 }, { "type": "selfDamage", "value": 2 }] }
+    "upgrade": {
+      "branchA": { "name": "强力生物打击", "description": "造成 10 伤害。失去 2 HP（侵蚀）。" },
+      "branchB": { "name": "毒化生物打击", "description": "造成 7 伤害。失去 2 HP（侵蚀）。施加 2 层毒素。" }
+    }
   },
   {
     "id": "regenerate",
     "name": "再生",
     "nameEn": "Regenerate",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Starter",
+    "artPath": "Symbiote/regenerate.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "starter",
     "cost": 1,
     "description": "获得 3 层再生（每回合回复 3 HP，持续 3 回合）。",
     "effects": [{ "type": "applyStatus", "statusId": "Regeneration", "value": 3, "target": "self" }],
-    "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "Regeneration", "value": 5, "target": "self" }] }
+    "upgrade": {
+      "branchA": { "name": "高速再生", "description": "获得 5 层再生（每回合回复 3 HP，持续 5 回合）。" },
+      "branchB": { "name": "应急再生", "description": "立即回复 6 HP。获得 2 层再生（每回合回复 3 HP，持续 2 回合）。" }
+    }
   },
   {
     "id": "chitin_armor",
     "name": "甲壳装甲",
     "nameEn": "Chitin Armor",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Starter",
+    "artPath": "Symbiote/chitin_armor.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "starter",
     "cost": 1,
     "description": "获得 6 护甲。如果你本回合失去过 HP，额外 +3。",
     "effects": [{ "type": "block", "value": 6 }, { "type": "conditionalBlock", "condition": "lostHpThisTurn", "value": 3 }],
-    "upgrade": { "effects": [{ "type": "block", "value": 8 }, { "type": "conditionalBlock", "condition": "lostHpThisTurn", "value": 5 }] }
+    "upgrade": {
+      "branchA": { "name": "强化甲壳", "description": "获得 8 护甲。如果你本回合失去过 HP，额外 +5。" },
+      "branchB": { "name": "荆棘甲壳", "description": "获得 6 护甲。如果你本回合失去过 HP，额外 +3 且获得 1 层荆棘。" }
+    }
   },
   {
     "id": "toxin_spit",
     "name": "毒液喷射",
     "nameEn": "Toxin Spit",
-    "class": "Symbiote",
-    "type": "Attack",
-    "rarity": "Starter",
+    "artPath": "Symbiote/toxin_spit.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "starter",
     "cost": 1,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "造成 4 伤害。施加 3 层毒素。",
     "effects": [{ "type": "damage", "value": 4 }, { "type": "applyStatus", "statusId": "Poison", "value": 3 }],
     "upgrade": { "effects": [{ "type": "damage", "value": 4 }, { "type": "applyStatus", "statusId": "Poison", "value": 5 }] }
@@ -53,11 +66,12 @@
     "id": "consume",
     "name": "吞噬",
     "nameEn": "Consume",
-    "class": "Symbiote",
-    "type": "Attack",
-    "rarity": "Starter",
+    "artPath": "Symbiote/consume.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "starter",
     "cost": 2,
-    "range": "Melee",
+    "range": "melee",
     "description": "造成 8 伤害。回复等同于造成伤害 30% 的 HP。",
     "effects": [{ "type": "damage", "value": 8 }, { "type": "lifesteal", "percent": 30 }],
     "upgrade": { "effects": [{ "type": "damage", "value": 12 }, { "type": "lifesteal", "percent": 30 }] }
@@ -66,11 +80,12 @@
     "id": "erosion_pulse",
     "name": "侵蚀脉冲",
     "nameEn": "Erosion Pulse",
-    "class": "Symbiote",
-    "type": "Attack",
-    "rarity": "Common",
+    "artPath": "Symbiote/erosion_pulse.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "common",
     "cost": 1,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "失去 4 HP。对所有敌人造成 6 伤害。",
     "effects": [{ "type": "selfDamage", "value": 4 }, { "type": "damage", "value": 6, "target": "allEnemies" }],
     "upgrade": { "effects": [{ "type": "selfDamage", "value": 3 }, { "type": "damage", "value": 9, "target": "allEnemies" }] }
@@ -79,9 +94,10 @@
     "id": "adaptive_skin",
     "name": "适应皮肤",
     "nameEn": "Adaptive Skin",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Common",
+    "artPath": "Symbiote/adaptive_skin.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "common",
     "cost": 1,
     "description": "获得 5 护甲。如果你在前排，额外获得 3。如果在后排，回复 3 HP。",
     "effects": [{ "type": "block", "value": 5 }, { "type": "rowConditional", "frontEffect": { "type": "block", "value": 3 }, "backEffect": { "type": "heal", "value": 3 } }],
@@ -91,9 +107,10 @@
     "id": "blood_pact",
     "name": "血之契约",
     "nameEn": "Blood Pact",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Common",
+    "artPath": "Symbiote/blood_pact.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "common",
     "cost": 0,
     "description": "失去 6 HP。获得 2 能量。",
     "effects": [{ "type": "selfDamage", "value": 6 }, { "type": "gainEnergy", "value": 2 }],
@@ -103,11 +120,12 @@
     "id": "viral_outbreak",
     "name": "病毒爆发",
     "nameEn": "Viral Outbreak",
-    "class": "Symbiote",
-    "type": "Attack",
-    "rarity": "Common",
+    "artPath": "Symbiote/viral_outbreak.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "common",
     "cost": 2,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "对目标造成 3 伤害。施加 5 层毒素。毒素从目标扩散 2 层到相邻敌人。",
     "effects": [{ "type": "damage", "value": 3 }, { "type": "applyStatus", "statusId": "Poison", "value": 5 }, { "type": "spreadPoison", "value": 2 }],
     "upgrade": { "effects": [{ "type": "damage", "value": 5 }, { "type": "applyStatus", "statusId": "Poison", "value": 7 }, { "type": "spreadPoison", "value": 3 }] }
@@ -116,9 +134,10 @@
     "id": "pain_threshold",
     "name": "痛觉阈值",
     "nameEn": "Pain Threshold",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Uncommon",
+    "artPath": "Symbiote/pain_threshold.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "uncommon",
     "cost": 1,
     "description": "本回合每失去 1 HP，获得 1 护甲。（持续到回合结束）",
     "effects": [{ "type": "applyStatus", "statusId": "PainThreshold", "value": 1, "target": "self", "duration": 1 }],
@@ -128,11 +147,12 @@
     "id": "parasitic_bond",
     "name": "寄生链接",
     "nameEn": "Parasitic Bond",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Uncommon",
+    "artPath": "Symbiote/parasitic_bond.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "uncommon",
     "cost": 1,
-    "range": "Ranged",
+    "range": "ranged",
     "description": "标记一个敌人。该敌人受到伤害时，你回复伤害值 20% 的 HP。持续 3 回合。",
     "effects": [{ "type": "applyStatus", "statusId": "ParasiticBond", "value": 20, "duration": 3 }],
     "upgrade": { "effects": [{ "type": "applyStatus", "statusId": "ParasiticBond", "value": 30, "duration": 3 }] }
@@ -141,9 +161,10 @@
     "id": "berserker_form",
     "name": "狂化形态",
     "nameEn": "Berserker Form",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Uncommon",
+    "artPath": "Symbiote/berserker_form.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "uncommon",
     "cost": 2,
     "description": "失去 10 HP。获得 3 层力量和 2 层荆棘。",
     "effects": [{ "type": "selfDamage", "value": 10 }, { "type": "applyStatus", "statusId": "Strength", "value": 3, "target": "self" }, { "type": "applyStatus", "statusId": "Thorns", "value": 2, "target": "self" }],
@@ -153,9 +174,10 @@
     "id": "mitosis",
     "name": "有丝分裂",
     "nameEn": "Mitosis",
-    "class": "Symbiote",
-    "type": "Skill",
-    "rarity": "Rare",
+    "artPath": "Symbiote/mitosis.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "rare",
     "cost": 2,
     "exhaust": true,
     "description": "消耗。将你当前 HP 的 20% 转化为最大 HP。获得 15 护甲。",
@@ -166,9 +188,10 @@
     "id": "apex_predator",
     "name": "顶级掠食者",
     "nameEn": "Apex Predator",
-    "class": "Symbiote",
-    "type": "Power",
-    "rarity": "Rare",
+    "artPath": "Symbiote/apex_predator.svg",
+    "class": "symbiote",
+    "type": "power",
+    "rarity": "rare",
     "cost": 3,
     "description": "永久效果：你每失去 5 HP，获得 1 层力量。击杀敌人时回复 5 HP。",
     "effects": [{ "type": "applyPower", "powerId": "ApexPredator", "strengthPerHpLost": 5, "killHeal": 5 }],
@@ -178,14 +201,572 @@
     "id": "pandemonium",
     "name": "大混乱",
     "nameEn": "Pandemonium",
-    "class": "Symbiote",
-    "type": "Attack",
-    "rarity": "Rare",
+    "artPath": "Symbiote/pandemonium.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "rare",
     "cost": 3,
-    "range": "Melee",
+    "range": "melee",
     "exhaust": true,
     "description": "消耗。失去当前 HP 的 30%。对单目标造成失去 HP ×3 倍的伤害。",
     "effects": [{ "type": "selfDamagePercent", "percent": 30 }, { "type": "damageFromHpLost", "multiplier": 3 }],
     "upgrade": { "effects": [{ "type": "selfDamagePercent", "percent": 25 }, { "type": "damageFromHpLost", "multiplier": 4 }] }
+  },
+  {
+    "id": "sacrificial_claw",
+    "name": "献祭之爪",
+    "nameEn": "Sacrificial Claw",
+    "artPath": "Symbiote/sacrificial_claw.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 1,
+    "range": "melee",
+    "description": "【前排】失去 3 HP，造成 10 伤害。\n【后排】造成 6 伤害。",
+    "frontEffects": [
+      { "type": "selfDamage", "value": 3 },
+      { "type": "damage", "value": 10 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 6 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "狂暴撕裂",
+        "description": "【前排】失去 3 HP，造成 14 伤害。\n【后排】造成 6 伤害。"
+      },
+      "branchB": {
+        "name": "安全投射",
+        "description": "【前排】失去 2 HP，造成 10 伤害。\n【后排】造成 9 伤害。"
+      }
+    }
+  },
+  {
+    "id": "venomous_tendril",
+    "name": "毒藤缠绕",
+    "nameEn": "Venomous Tendril",
+    "artPath": "Symbiote/venomous_tendril.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 1,
+    "range": "ranged",
+    "description": "造成 5 伤害。如果目标有毒素，额外造成 3 伤害。",
+    "effects": [
+      { "type": "damage", "value": 5 },
+      { "type": "damage", "value": 3, "condition": "targetPoisoned" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "毒素绽放",
+        "description": "造成 5 伤害。如果目标有毒素，额外造成 5 伤害。"
+      },
+      "branchB": {
+        "name": "毒素注入",
+        "description": "造成 5 伤害。施加 2 层毒素。如果目标已有毒素，施加 3 层。"
+      }
+    }
+  },
+  {
+    "id": "flesh_rend",
+    "name": "血肉撕裂",
+    "nameEn": "Flesh Rend",
+    "artPath": "Symbiote/flesh_rend.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 2,
+    "range": "melee",
+    "description": "造成 10 伤害。如果你 HP 低于 50%，再造成 6 伤害。",
+    "effects": [
+      { "type": "damage", "value": 10 },
+      { "type": "damage", "value": 6, "condition": "hpBelow50%" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "裂伤加深",
+        "description": "造成 10 伤害。如果你 HP 低于 50%，再造成 10 伤害。"
+      },
+      "branchB": {
+        "name": "均匀撕裂",
+        "description": "造成 12 伤害。如果你 HP 低于 60%，再造成 6 伤害。"
+      }
+    }
+  },
+  {
+    "id": "siphon_life",
+    "name": "生命虹吸",
+    "nameEn": "Siphon Life",
+    "artPath": "Symbiote/siphon_life.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "common",
+    "cost": 1,
+    "range": "ranged",
+    "description": "【前排】造成 7 伤害，恢复 4 HP。\n【后排】造成 8 伤害，恢复 1 HP。",
+    "frontEffects": [
+      { "type": "damage", "value": 7 },
+      { "type": "heal", "value": 4 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 8 },
+      { "type": "heal", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "贪婪吸取",
+        "description": "【前排】造成 9 伤害，恢复 5 HP。\n【后排】造成 8 伤害，恢复 2 HP。"
+      },
+      "branchB": {
+        "name": "远程虹吸",
+        "description": "【前排】造成 7 伤害，恢复 4 HP。\n【后排】造成 12 伤害，恢复 2 HP。"
+      }
+    }
+  },
+  {
+    "id": "blood_coagulant",
+    "name": "血液凝固",
+    "nameEn": "Blood Coagulant",
+    "artPath": "Symbiote/blood_coagulant.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "common",
+    "cost": 0,
+    "description": "如果你本回合失去过 HP，获得 5 护甲。否则获得 2 护甲。",
+    "effects": [
+      { "type": "conditionalBlock", "condition": "lostHpThisTurn", "value": 5 },
+      { "type": "block", "value": 2 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "爆发凝固",
+        "description": "如果你本回合失去过 HP，获得 8 护甲。否则获得 3 护甲。"
+      },
+      "branchB": {
+        "name": "薄壳",
+        "description": "获得 4 护甲。如果你本回合失去过 HP，额外获得 3 护甲。"
+      }
+    }
+  },
+  {
+    "id": "tumor_shield",
+    "name": "瘤化护盾",
+    "nameEn": "Tumor Shield",
+    "artPath": "Symbiote/tumor_shield.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "common",
+    "cost": 1,
+    "description": "【前排】失去 3 HP，获得 12 护甲。\n【后排】获得 6 护甲。",
+    "frontEffects": [
+      { "type": "selfDamage", "value": 3 },
+      { "type": "block", "value": 12 }
+    ],
+    "backEffects": [
+      { "type": "block", "value": 6 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "厚壳化",
+        "description": "【前排】失去 3 HP，获得 16 护甲。\n【后排】获得 8 护甲。"
+      },
+      "branchB": {
+        "name": "自愈型",
+        "description": "【前排】失去 2 HP，获得 12 护甲。\n【后排】获得 6 护甲，恢复 2 HP。"
+      }
+    }
+  },
+  {
+    "id": "adrenaline_surge",
+    "name": "肾上腺素涌流",
+    "nameEn": "Adrenaline Surge",
+    "artPath": "Symbiote/adrenaline_surge.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "common",
+    "cost": 1,
+    "description": "失去 3 HP。抽 2 张牌。",
+    "effects": [
+      { "type": "selfDamage", "value": 3 },
+      { "type": "draw", "value": 2 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "深层涌流",
+        "description": "失去 3 HP。抽 3 张牌。"
+      },
+      "branchB": {
+        "name": "减压涌流",
+        "description": "失去 2 HP。抽 2 张牌。"
+      }
+    }
+  },
+  {
+    "id": "life_funnel",
+    "name": "生命漏斗",
+    "nameEn": "Life Funnel",
+    "artPath": "Symbiote/life_funnel.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "uncommon",
+    "cost": 1,
+    "description": "失去 5 HP。对所有敌人施加 3 层毒素。",
+    "effects": [
+      { "type": "selfDamage", "value": 5 },
+      { "type": "applyStatus", "statusId": "Poison", "value": 3, "target": "allEnemies" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "扩散感染",
+        "description": "失去 5 HP。对所有敌人施加 5 层毒素。"
+      },
+      "branchB": {
+        "name": "低耗感染",
+        "description": "失去 3 HP。对所有敌人施加 3 层毒素。"
+      }
+    }
+  },
+  {
+    "id": "hemorrhage",
+    "name": "大出血",
+    "nameEn": "Hemorrhage",
+    "artPath": "Symbiote/hemorrhage.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 2,
+    "range": "melee",
+    "description": "失去 8 HP。造成 16 伤害。如果你 HP 低于 40%，不消耗能量。",
+    "effects": [
+      { "type": "selfDamage", "value": 8 },
+      { "type": "damage", "value": 16 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "撕裂爆发",
+        "description": "失去 6 HP。造成 20 伤害。"
+      },
+      "branchB": {
+        "name": "低血量免费",
+        "description": "失去 8 HP。造成 14 伤害。如果你 HP 低于 40%，不消耗能量。"
+      }
+    }
+  },
+  {
+    "id": "parasitic_shell",
+    "name": "寄生甲壳",
+    "nameEn": "Parasitic Shell",
+    "artPath": "Symbiote/parasitic_shell.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "uncommon",
+    "cost": 1,
+    "description": "获得 1 层荆棘。获得 4 护甲。如果你 HP 低于 50%，额外获得 3 层荆棘。",
+    "effects": [
+      { "type": "applyStatus", "statusId": "Thorns", "value": 1, "target": "self" },
+      { "type": "block", "value": 4 },
+      { "type": "conditionalStatus", "condition": "hpBelow50%", "statusId": "Thorns", "value": 3, "target": "self" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "尖刺外壳",
+        "description": "获得 3 层荆棘。获得 5 护甲。如果你 HP 低于 50%，额外获得 3 层荆棘。"
+      },
+      "branchB": {
+        "name": "高阈值外壳",
+        "description": "获得 1 层荆棘。获得 6 护甲。如果你 HP 低于 65%，额外获得 3 层荆棘。"
+      }
+    }
+  },
+  {
+    "id": "sanguine_rush",
+    "name": "血色冲刺",
+    "nameEn": "Sanguine Rush",
+    "artPath": "Symbiote/sanguine_rush.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 1,
+    "range": "melee",
+    "description": "造成 5 + 你本回合已失去 HP 点数的伤害。",
+    "effects": [
+      { "type": "damage", "value": 5, "condition": "addLostHpThisTurn" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "深度血怒",
+        "description": "造成 7 + 你本回合已失去 HP 点数的伤害。"
+      },
+      "branchB": {
+        "name": "血色回响",
+        "description": "造成 5 + 你本回合已失去 HP 点数的伤害。恢复伤害值的 15% HP。"
+      }
+    }
+  },
+  {
+    "id": "tactical_erosion",
+    "name": "战术侵蚀",
+    "nameEn": "Tactical Erosion",
+    "artPath": "Symbiote/tactical_erosion.svg",
+    "class": "symbiote",
+    "type": "power",
+    "rarity": "uncommon",
+    "cost": 2,
+    "description": "永久效果：每次你失去 HP 时，对随机敌人造成等同于失去 HP 50% 的伤害。",
+    "effects": [
+      { "type": "applyPower", "powerId": "TacticalErosion", "damagePercentLostHp": 50 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "侵蚀回响",
+        "description": "永久效果：每次你失去 HP 时，对随机敌人造成等同于失去 HP 75% 的伤害。"
+      },
+      "branchB": {
+        "name": "侵蚀尖刺",
+        "description": "永久效果：每次你失去 HP 时，对随机敌人造成等同于失去 HP 50% 的伤害，施加 1 层毒素。"
+      }
+    }
+  },
+  {
+    "id": "life_drain",
+    "name": "生命汲取",
+    "nameEn": "Life Drain",
+    "artPath": "Symbiote/life_drain.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 2,
+    "range": "ranged",
+    "description": "【前排】造成 8 伤害，恢复等同于造成伤害 50% 的 HP。\n【后排】造成 6 伤害，恢复等同于造成伤害 30% 的 HP。",
+    "frontEffects": [
+      { "type": "damage", "value": 8 },
+      { "type": "lifesteal", "percent": 50 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 6 },
+      { "type": "lifesteal", "percent": 30 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "前线贪婪",
+        "description": "【前排】造成 10 伤害，恢复等同于造成伤害 60% 的 HP。\n【后排】造成 6 伤害，恢复等同于造成伤害 30% 的 HP。"
+      },
+      "branchB": {
+        "name": "远程安全",
+        "description": "【前排】造成 8 伤害，恢复等同于造成伤害 50% 的 HP。\n【后排】造成 9 伤害，恢复等同于造成伤害 40% 的 HP。"
+      }
+    }
+  },
+  {
+    "id": "death_grasp",
+    "name": "死亡之握",
+    "nameEn": "Death Grasp",
+    "artPath": "Symbiote/death_grasp.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "uncommon",
+    "cost": 1,
+    "range": "melee",
+    "description": "造成 7 伤害。如果击杀目标，恢复 5 HP。",
+    "effects": [
+      { "type": "damage", "value": 7 },
+      { "type": "healOnKill", "value": 5 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "贪婪吞噬",
+        "description": "造成 9 伤害。如果击杀目标，恢复 8 HP。"
+      },
+      "branchB": {
+        "name": "连锁猎杀",
+        "description": "造成 7 伤害。如果击杀目标，恢复 5 HP 并抽 1 张牌。"
+      }
+    }
+  },
+  {
+    "id": "bio_overclock",
+    "name": "生物超频",
+    "nameEn": "Bio Overclock",
+    "artPath": "Symbiote/bio_overclock.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "uncommon",
+    "cost": 0,
+    "description": "失去 4 HP。获得 1 能量和 2 层力量。如果你 HP 低于 50%，获得 3 层力量而非 2。",
+    "effects": [
+      { "type": "selfDamage", "value": 4 },
+      { "type": "gainEnergy", "value": 1 },
+      { "type": "conditionalStatus", "condition": "hpBelow50%", "statusId": "Strength", "value": 3, "target": "self" },
+      { "type": "applyStatus", "statusId": "Strength", "value": 2, "target": "self" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "深度超频",
+        "description": "失去 6 HP。获得 2 能量和 2 层力量。如果你 HP 低于 50%，获得 4 层力量。"
+      },
+      "branchB": {
+        "name": "安全超频",
+        "description": "失去 2 HP。获得 1 能量和 1 层力量。如果你 HP 低于 50%，获得 3 层力量。"
+      }
+    }
+  },
+  {
+    "id": "devouring_swarm",
+    "name": "吞噬蜂群",
+    "nameEn": "Devouring Swarm",
+    "artPath": "Symbiote/devouring_swarm.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "rare",
+    "cost": 2,
+    "range": "ranged",
+    "description": "对所有敌人造成 4 伤害，施加 2 层毒素。你每有一层毒素造成的伤害，恢复 1 HP。",
+    "effects": [
+      { "type": "damage", "value": 4, "target": "allEnemies" },
+      { "type": "applyStatus", "statusId": "Poison", "value": 2, "target": "allEnemies" },
+      { "type": "healPerPoisonDamage", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "蜂群扩散",
+        "description": "对所有敌人造成 5 伤害，施加 3 层毒素。你每有一层毒素造成的伤害，恢复 1 HP。"
+      },
+      "branchB": {
+        "name": "蜂群汲取",
+        "description": "对所有敌人造成 4 伤害，施加 2 层毒素。你每有一层毒素造成的伤害，恢复 2 HP。"
+      }
+    }
+  },
+  {
+    "id": "blood_ritual",
+    "name": "血之仪式",
+    "nameEn": "Blood Ritual",
+    "artPath": "Symbiote/blood_ritual.svg",
+    "class": "symbiote",
+    "type": "power",
+    "rarity": "rare",
+    "cost": 2,
+    "description": "永久效果：你的回合开始时，如果 HP 低于 50%，获得 1 层力量和 1 能量。",
+    "effects": [
+      { "type": "applyPower", "powerId": "BloodRitual" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "深层仪式",
+        "description": "永久效果：你的回合开始时，如果 HP 低于 50%，获得 2 层力量。"
+      },
+      "branchB": {
+        "name": "宽限仪式",
+        "description": "永久效果：你的回合开始时，如果 HP 低于 65%，获得 1 层力量和 1 能量。"
+      }
+    }
+  },
+  {
+    "id": "necrotic_burst",
+    "name": "坏死爆发",
+    "nameEn": "Necrotic Burst",
+    "artPath": "Symbiote/necrotic_burst.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "rare",
+    "cost": 2,
+    "range": "melee",
+    "description": "【前排】失去 6 HP，造成 18 伤害。\n【后排】造成 8 伤害，施加 3 层毒素。",
+    "frontEffects": [
+      { "type": "selfDamage", "value": 6 },
+      { "type": "damage", "value": 18 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 8 },
+      { "type": "applyStatus", "statusId": "Poison", "value": 3 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "极端爆发",
+        "description": "【前排】失去 8 HP，造成 24 伤害。\n【后排】造成 8 伤害，施加 3 层毒素。"
+      },
+      "branchB": {
+        "name": "后方毒化",
+        "description": "【前排】失去 6 HP，造成 18 伤害。\n【后排】造成 10 伤害，施加 5 层毒素。"
+      }
+    }
+  },
+  {
+    "id": "metamorphosis",
+    "name": "蜕变",
+    "nameEn": "Metamorphosis",
+    "artPath": "Symbiote/metamorphosis.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "rare",
+    "cost": 3,
+    "exhaust": true,
+    "description": "消耗。将 HP 设置为最大 HP 的 35%。获得 4 层力量和 3 层再生。",
+    "effects": [
+      { "type": "setHpPercent", "percent": 35 },
+      { "type": "applyStatus", "statusId": "Strength", "value": 4, "target": "self" },
+      { "type": "applyStatus", "statusId": "Regeneration", "value": 3, "target": "self" }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "极端蜕变",
+        "description": "消耗。将 HP 设置为最大 HP 的 25%。获得 6 层力量。"
+      },
+      "branchB": {
+        "name": "安全蜕变",
+        "description": "消耗。将 HP 设置为最大 HP 的 40%。获得 3 层力量和 5 层再生。"
+      }
+    }
+  },
+  {
+    "id": "laceration",
+    "name": "撕裂伤",
+    "nameEn": "Laceration",
+    "artPath": "Symbiote/laceration.svg",
+    "class": "symbiote",
+    "type": "attack",
+    "rarity": "rare",
+    "cost": 1,
+    "range": "melee",
+    "description": "造成 6 伤害。目标每有一层负面状态，额外造成 2 伤害。",
+    "effects": [
+      { "type": "damage", "value": 6 },
+      { "type": "damagePerDebuff", "value": 2 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "深层撕裂",
+        "description": "造成 8 伤害。目标每有一层负面状态，额外造成 2 伤害。"
+      },
+      "branchB": {
+        "name": "连锁撕裂",
+        "description": "造成 6 伤害。目标每有一层负面状态，额外造成 3 伤害。"
+      }
+    }
+  },
+  {
+    "id": "blood_purge",
+    "name": "血液净化",
+    "nameEn": "Blood Purge",
+    "artPath": "Symbiote/blood_purge.svg",
+    "class": "symbiote",
+    "type": "skill",
+    "rarity": "rare",
+    "cost": 1,
+    "description": "失去你当前 HP 的 15%。移除自身所有负面状态。每移除 1 层，获得 2 护甲。",
+    "effects": [
+      { "type": "selfDamagePercent", "percent": 15 },
+      { "type": "purgeDebuffs", "armorPerStack": 2 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "强力净化",
+        "description": "失去你当前 HP 的 10%。移除自身所有负面状态。每移除 1 层，获得 3 护甲。"
+      },
+      "branchB": {
+        "name": "全面净化",
+        "description": "失去你当前 HP 的 15%。移除自身所有负面状态。每移除 1 层，获得 2 护甲。抽 1 张牌。"
+      }
+    }
   }
 ]

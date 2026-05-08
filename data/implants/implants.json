@@ -3,10 +3,11 @@
     "id": "neural_optimizer",
     "name": "神经优化器",
     "nameEn": "Neural Optimizer",
-    "description": "每回合多抽 1 张牌。",
+    "description": "每回合多抽 1 张牌。（事件奖励：非可装备植入体）",
     "slot": "neural",
     "rarity": "common",
     "craftCost": 15,
+    "equippable": false,
     "effects": [
       { "type": "drawPerTurn", "value": 1 }
     ]
@@ -25,29 +26,51 @@
     ]
   },
   {
-    "id": "dermal_plating",
-    "name": "皮下装甲",
-    "nameEn": "Dermal Plating",
-    "description": "最大生命值 +15。每回合开始获得 2 点护甲。",
-    "slot": "somatic",
-    "rarity": "common",
-    "craftCost": 15,
+    "id": "overload_circuit",
+    "name": "过载回路",
+    "nameEn": "Overload Circuit",
+    "description": "回合结束时，每点未使用的能量对你造成 2 点伤害。风险换力量。",
+    "slot": "neural",
+    "rarity": "uncommon",
+    "craftCost": 20,
     "effects": [
-      { "type": "maxHp", "value": 15 },
-      { "type": "turnStartBlock", "value": 2 }
+      { "type": "overloadCircuit", "value": 2 }
     ]
   },
   {
-    "id": "adrenal_pump",
-    "name": "肾上腺泵",
-    "nameEn": "Adrenal Pump",
-    "description": "击杀敌人时获得 1 点能量。最大生命值 -10。",
-    "slot": "somatic",
+    "id": "pulse_processor",
+    "name": "脉冲处理器",
+    "nameEn": "Pulse Processor",
+    "description": "打出卡牌时立即再抽 1 张牌。",
+    "slot": "neural",
     "rarity": "uncommon",
     "craftCost": 25,
     "effects": [
-      { "type": "killEnergy", "value": 1 },
-      { "type": "maxHp", "value": -10 }
+      { "type": "pulseProcessor", "value": 1 }
+    ]
+  },
+  {
+    "id": "precognition_module",
+    "name": "预知模块",
+    "nameEn": "Precognition Module",
+    "description": "每 2 回合窥视抽牌堆顶 2 张牌，保留 1 张。",
+    "slot": "neural",
+    "rarity": "rare",
+    "craftCost": 35,
+    "effects": [
+      { "type": "precognitionModule", "value": 1 }
+    ]
+  },
+  {
+    "id": "battlefield_interface",
+    "name": "战场接口",
+    "nameEn": "Battlefield Interface",
+    "description": "切换阵型不消耗能量。切换后，本回合打出的下一张卡牌消耗 -1。",
+    "slot": "neural",
+    "rarity": "rare",
+    "craftCost": 30,
+    "effects": [
+      { "type": "battlefieldInterface", "value": 1 }
     ]
   },
   {

@@ -1,4 +1,5 @@
 using RogueCardGame.Core.Characters;
+using RogueCardGame.Core.Utils;
 
 namespace RogueCardGame.Core.Combat.Actions;
 
@@ -19,6 +20,9 @@ public class ActionManager
 
     /// <summary>Reference to the combat manager for context.</summary>
     public CombatManager? Combat { get; set; }
+
+    /// <summary>The currently executing card effect context, if actions are resolving from a card play.</summary>
+    public CardEffectContext? CurrentEffectContext { get; set; }
 
     /// <summary>
     /// Add an action to execute immediately after the current one finishes (interrupt).
@@ -74,7 +78,7 @@ public class ActionManager
         }
 
         if (safetyCounter >= maxIterations)
-            Godot.GD.PrintErr("[ActionManager] Hit safety limit — possible infinite loop in action queue");
+            EffectLog.Error("[ActionManager] Hit safety limit — possible infinite loop in action queue");
     }
 
     /// <summary>

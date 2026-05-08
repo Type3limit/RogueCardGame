@@ -21,6 +21,7 @@ public enum CardRarity
     Common,
     Uncommon,
     Rare,
+    Legendary,
     Special // events, boss rewards, etc.
 }
 

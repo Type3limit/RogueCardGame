@@ -45,6 +45,9 @@ public sealed class Card
             _ => Data.Effects
         };
 
+    /// <summary>True if this card exhausts (is removed from deck) after play.</summary>
+    public bool Exhaust => Data.Exhaust;
+
     public string ActiveDescription =>
         Branch switch
         {

@@ -38,6 +38,14 @@ public abstract class AbstractPower
     /// <summary>Reference to action manager for enqueueing actions from hooks.</summary>
     public ActionManager? ActionManager { get; set; }
 
+    /// <summary>The combatant that applied this power (for link/parasite effects).</summary>
+    public Combatant? Source { get; set; }
+
+    /// <summary>Optional implant bonus provider injected by the owning PowerManager.</summary>
+    public Func<string, int>? ImplantBonusProvider { get; set; }
+
+    protected int GetImplantBonus(string effectType) => ImplantBonusProvider?.Invoke(effectType) ?? 0;
+
     // =====================================================================
     //  LIFECYCLE HOOKS — Override in subclasses to add behavior
     // =====================================================================
@@ -76,8 +84,8 @@ public abstract class AbstractPower
     /// <summary>Called after the owner deals damage to a target.</summary>
     public virtual void OnDealDamage(Combatant target, int amount) { }
 
-    /// <summary>Called after the owner takes damage (after block).</summary>
-    public virtual void OnTakeDamage(int amount) { }
+    /// <summary>Called after the owner takes damage (after block). Attacker is the combatant that dealt the hit, null for non-attack damage (poison, env).</summary>
+    public virtual void OnTakeDamage(int amount, Combatant? attacker = null) { }
 
     // --- Block hooks ---
 
@@ -107,6 +115,59 @@ public abstract class AbstractPower
 
     /// <summary>Called when the owner heals.</summary>
     public virtual void OnHeal(int amount) { }
+
+    /// <summary>Called when the owner consumes overcharge stacks.</summary>
+    public virtual void OnOverchargeConsumed(int stacks) { }
+
+    /// <summary>Called when the owner consumes resonance stacks. Can modify damage.</summary>
+    public virtual float ModifyConsumeResonanceDamage(float damage, int stacks) => damage;
+
+    /// <summary>Called when the owner consumes overcharge stacks. Can modify damage (e.g. FrontlineCommander +1/stack).</summary>
+    public virtual float ModifyOverchargeConsumeDamage(float damage, int stacks) => damage;
+
+    /// <summary>Modify the energy cost of a card. Returns modified cost.</summary>
+    public virtual int ModifyCardCost(Card card, int baseCost, Combatant? target) => baseCost;
+
+    // =====================================================================
+    //  DISPATCHER SUBSCRIPTION — replaces the PowerManager "hook wall"
+    // =====================================================================
+
+    // Use a list (not dict) so multiple subs on the same TriggerKind are all tracked for clean unsubscription.
+    private readonly List<(TriggerKind kind, CombatEventDispatcher.Handler handler)> _subscriptions = new();
+
+    /// <summary>
+    /// Subscribe this power's virtual hooks to the Dispatcher event bus.
+    /// Called automatically by PowerManager when EventBus is set and a power is applied.
+    /// Subclasses may override to customise which events they listen to.
+    /// </summary>
+    public virtual void SubscribeTo(CombatEventDispatcher bus)
+    {
+        AddSub(bus, TriggerKind.AtTurnStart,   evt => { if (evt.Actor == Owner) AtTurnStart(); });
+        AddSub(bus, TriggerKind.AtTurnEnd,     evt => { if (evt.Actor == Owner) AtTurnEnd(); });
+        AddSub(bus, TriggerKind.OnCardPlayed,  evt => { if (evt.Actor == Owner && evt.Card != null) OnCardPlayed(evt.Card); });
+        AddSub(bus, TriggerKind.OnCardDrawn,   evt => { if (evt.Actor == Owner && evt.Card != null) OnCardDrawn(evt.Card); });
+        AddSub(bus, TriggerKind.OnDealDamage,  evt => { if (evt.Actor == Owner && evt.Target != null) OnDealDamage(evt.Target, evt.Amount); });
+        AddSub(bus, TriggerKind.OnTakeDamage,  evt => { if (evt.Target == Owner) OnTakeDamage(evt.Amount, evt.Actor); });
+        AddSub(bus, TriggerKind.OnDeath,       evt => { if (evt.Actor == Owner) OnDeath(); });
+        AddSub(bus, TriggerKind.OnKill,        evt => { if (evt.Actor == Owner && evt.Target != null) OnKill(evt.Target); });
+        AddSub(bus, TriggerKind.OnHeal,        evt => { if (evt.Target == Owner) OnHeal(evt.Amount); });
+        AddSub(bus, TriggerKind.OnOverchargeConsumed,
+                                               evt => { if (evt.Actor == Owner) OnOverchargeConsumed(evt.Amount); });
+    }
+
+    /// <summary>Unsubscribe all subscriptions established by SubscribeTo.</summary>
+    public virtual void UnsubscribeFrom(CombatEventDispatcher bus)
+    {
+        foreach (var (kind, handler) in _subscriptions)
+            bus.Unsubscribe(kind, handler);
+        _subscriptions.Clear();
+    }
+
+    private void AddSub(CombatEventDispatcher bus, TriggerKind kind, CombatEventDispatcher.Handler handler)
+    {
+        _subscriptions.Add((kind, handler));
+        bus.Subscribe(kind, handler, Priority);
+    }
 }
 
 /// <summary>
@@ -123,24 +184,39 @@ public class PowerManager
     /// <summary>Reference to the action manager for injecting into new powers.</summary>
     public ActionManager? ActionManager { get; set; }
 
+    /// <summary>Optional implant bonus provider for powers that need implant-aware behavior.</summary>
+    public Func<string, int>? ImplantBonusProvider { get; set; }
+
+    /// <summary>
+    /// When set, every power applied to this manager automatically subscribes its hooks
+    /// to the event bus.  Set by CombatManager after Initialize().
+    /// </summary>
+    public CombatEventDispatcher? EventBus { get; set; }
+
     /// <summary>
     /// Apply a power to the combatant. If the same PowerId already exists, stacks are added.
+    /// Optional <paramref name="source"/> records which combatant produced the power (for parasite/link effects).
     /// </summary>
-    public void ApplyPower(AbstractPower power, Combatant owner)
+    public void ApplyPower(AbstractPower power, Combatant owner, Combatant? source = null)
     {
         power.Owner = owner;
         power.ActionManager = ActionManager;
+        power.ImplantBonusProvider = ImplantBonusProvider;
+        if (source != null) power.Source = source;
 
         var existing = _powers.FirstOrDefault(p => p.PowerId == power.PowerId);
         if (existing != null)
         {
             existing.Amount += power.Amount;
+            if (source != null && existing.Source == null) existing.Source = source;
             existing.OnStacksAdded(power.Amount);
         }
         else
         {
             _powers.Add(power);
             power.OnApply();
+            // Wire to dispatcher AFTER OnApply so the power can inspect its own state first
+            if (EventBus != null) power.SubscribeTo(EventBus);
         }
 
         // Notify all powers on this owner that a power was applied
@@ -154,6 +230,7 @@ public class PowerManager
         var power = _powers.FirstOrDefault(p => p.PowerId == powerId);
         if (power != null)
         {
+            if (EventBus != null) power.UnsubscribeFrom(EventBus);
             power.OnRemove();
             _powers.Remove(power);
         }
@@ -232,9 +309,9 @@ public class PowerManager
         foreach (var p in GetPowersByPriority()) p.OnDealDamage(target, amount);
     }
 
-    public void TriggerOnTakeDamage(int amount)
+    public void TriggerOnTakeDamage(int amount, Combatant? attacker = null)
     {
-        foreach (var p in GetPowersByPriority()) p.OnTakeDamage(amount);
+        foreach (var p in GetPowersByPriority()) p.OnTakeDamage(amount, attacker);
     }
 
     public void TriggerOnCardPlayed(Card card)
@@ -262,13 +339,65 @@ public class PowerManager
         foreach (var p in GetPowersByPriority()) p.OnHeal(amount);
     }
 
+    public void TriggerOnOverchargeConsumed(int stacks)
+    {
+        foreach (var p in GetPowersByPriority()) p.OnOverchargeConsumed(stacks);
+    }
+
+    public float ModifyConsumeResonanceDamage(float damage, int stacks)
+    {
+        float d = damage;
+        foreach (var p in GetPowersByPriority())
+            d = p.ModifyConsumeResonanceDamage(d, stacks);
+        return d;
+    }
+
+    public float ModifyOverchargeConsumeDamage(float damage, int stacks)
+    {
+        float d = damage;
+        foreach (var p in GetPowersByPriority())
+            d = p.ModifyOverchargeConsumeDamage(d, stacks);
+        return d;
+    }
+
+    public int ModifyCardCost(Card card, int baseCost, Combatant? target)
+    {
+        int cost = baseCost;
+        foreach (var p in GetPowersByPriority())
+            cost = p.ModifyCardCost(card, cost, target);
+        return cost;
+    }
+
     /// <summary>Clear all powers (end of combat cleanup).</summary>
     public void Clear()
     {
-        foreach (var p in _powers) p.OnRemove();
+        foreach (var p in _powers)
+        {
+            if (EventBus != null) p.UnsubscribeFrom(EventBus);
+            p.OnRemove();
+        }
         _powers.Clear();
     }
 
     private IEnumerable<AbstractPower> GetPowersByPriority() =>
         _powers.OrderBy(p => p.Priority).ToList(); // ToList to avoid modification during iteration
+
+    /// <summary>
+    /// Tick down all TicksDown powers by one; remove those that reach 0.
+    /// Called by CombatManager at the end of each turn, after AtTurnEnd events fire.
+    /// </summary>
+    public void TickDownPowers()
+    {
+        var toRemove = new List<string>();
+        foreach (var p in _powers)
+        {
+            if (p.TicksDown)
+            {
+                p.Amount--;
+                if (p.Amount <= 0)
+                    toRemove.Add(p.PowerId);
+            }
+        }
+        foreach (var id in toRemove) RemovePower(id);
+    }
 }

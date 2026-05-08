@@ -190,6 +190,28 @@ public class DeckManager
         return _drawPile.Skip(_drawPile.Count - actual).Take(actual).Reverse().ToList();
     }
 
+    /// <summary>
+    /// Number of cards remaining in the draw pile.
+    /// </summary>
+    public int DrawPileCount => _drawPile.Count;
+
+    /// <summary>
+    /// Remove a specific card from the draw pile (for scry manipulation).
+    /// Returns true if the card was found and removed.
+    /// </summary>
+    public bool TakeFromDrawPile(Card card)
+    {
+        return _drawPile.Remove(card);
+    }
+
+    /// <summary>
+    /// Add a card to the bottom of the draw pile (drawn last).
+    /// </summary>
+    public void AddToDrawPileBottom(Card card)
+    {
+        _drawPile.Insert(0, card);
+    }
+
     private void ShuffleDiscardIntoDraw()
     {
         _drawPile.AddRange(_discardPile);

@@ -3,6 +3,7 @@
     "id": "phase_charge",
     "name": "相位突进",
     "nameEn": "Phase Charge",
+    "artPath": "vanguard/phase_charge.svg",
     "class": "vanguard",
     "rarity": "common",
     "type": "skill",
@@ -21,19 +22,11 @@
     "upgrade": {
       "branchA": {
         "name": "攻势突进",
-        "description": "【前排】对目标造成 12 点伤害，退入后排。\n【后排】移入前排，获得 8 点护甲。",
-        "effects": [
-          { "type": "damage", "value": 12 },
-          { "type": "selfreposition", "value": 1 }
-        ]
+        "description": "【前排】对目标造成 12 点伤害，退入后排。\n【后排】移入前排，获得 8 点护甲。"
       },
       "branchB": {
         "name": "铁壁突进",
-        "description": "【前排】对目标造成 8 点伤害，退入后排。\n【后排】移入前排，获得 12 点护甲。",
-        "effects": [
-          { "type": "selfreposition", "value": 0 },
-          { "type": "block", "value": 12 }
-        ]
+        "description": "【前排】对目标造成 8 点伤害，退入后排。\n【后排】移入前排，获得 12 点护甲。"
       }
     }
   },
@@ -41,15 +34,16 @@
     "id": "psi_lance",
     "name": "灵能长矛",
     "nameEn": "Psi Lance",
+    "artPath": "psion/psi_lance.svg",
     "class": "psion",
     "rarity": "common",
     "type": "attack",
     "cost": 2,
     "range": "ranged",
     "targetType": "singleEnemy",
-    "description": "【前排】造成 6 点伤害，施加 1 层易伤。\n【后排】造成 10 点伤害。",
+    "description": "【前排】造成 8 点伤害，施加 1 层易伤。\n【后排】造成 10 点伤害。",
     "frontEffects": [
-      { "type": "damage", "value": 6 },
+      { "type": "damage", "value": 8 },
       { "type": "status", "statusId": "Vulnerable", "value": 1 }
     ],
     "backEffects": [
@@ -57,12 +51,12 @@
     ],
     "upgrade": {
       "branchA": {
-        "name": "狙击版",
-        "description": "【前排】造成 6 点伤害，施加 2 层易伤。\n【后排】造成 14 点伤害。"
+        "name": "压制版",
+        "description": "【前排】造成 10 点伤害，施加 2 层易伤。\n【后排】造成 10 点伤害。"
       },
       "branchB": {
-        "name": "压制版",
-        "description": "【前排】造成 9 点伤害。\n【后排】造成 10 点伤害，施加 1 层虚弱。"
+        "name": "狙击版",
+        "description": "【前排】造成 8 点伤害，施加 1 层易伤。\n【后排】造成 14 点伤害。"
       }
     }
   },
@@ -70,28 +64,29 @@
     "id": "ghost_probe",
     "name": "幽影刺探",
     "nameEn": "Ghost Probe",
+    "artPath": "netrunner/ghost_probe.svg",
     "class": "netrunner",
     "rarity": "common",
     "type": "skill",
     "cost": 1,
     "range": "none",
     "targetType": "singleEnemy",
-    "description": "【前排】造成 5 点伤害并施加 1 层虚弱。\n【后排】抽 2 张牌。",
+    "description": "【前排】对目标施加 2 层虚弱。\n【后排】抽 1 张牌，施加 1 层虚弱。",
     "frontEffects": [
-      { "type": "damage", "value": 5 },
-      { "type": "status", "statusId": "Weak", "value": 1 }
+      { "type": "status", "statusId": "Weak", "value": 2 }
     ],
     "backEffects": [
-      { "type": "draw", "value": 2 }
+      { "type": "draw", "value": 1 },
+      { "type": "status", "statusId": "Weak", "value": 1 }
     ],
     "upgrade": {
       "branchA": {
-        "name": "狙击版",
-        "description": "【前排】造成 5 点伤害，施加 1 层虚弱，再施加 1 层易伤。\n【后排】抽 2 张牌。"
+        "name": "深度压制",
+        "description": "【前排】对目标施加 3 层虚弱。\n【后排】抽 1 张牌，施加 1 层虚弱。"
       },
       "branchB": {
-        "name": "情报版",
-        "description": "【前排】造成 5 点伤害和 1 层虚弱。\n【后排】抽 3 张牌。"
+        "name": "情报压制",
+        "description": "【前排】对目标施加 2 层虚弱。\n【后排】抽 2 张牌，施加 1 层虚弱。"
       }
     }
   },
@@ -99,29 +94,30 @@
     "id": "bio_adapt",
     "name": "生物适应",
     "nameEn": "Bio Adapt",
+    "artPath": "symbiote/bio_adapt.svg",
     "class": "symbiote",
     "rarity": "common",
     "type": "skill",
     "cost": 1,
     "range": "none",
     "targetType": "singleEnemy",
-    "description": "【前排】造成 6 点伤害，恢复 3 点生命。\n【后排】造成 10 点伤害，抽 1 张牌。",
+    "description": "【前排】造成 8 点伤害，恢复 4 点生命。\n【后排】造成 8 点伤害，施加 2 层毒素。",
     "frontEffects": [
-      { "type": "damage", "value": 6 },
-      { "type": "heal", "value": 3 }
+      { "type": "damage", "value": 8 },
+      { "type": "heal", "value": 4 }
     ],
     "backEffects": [
-      { "type": "damage", "value": 10 },
-      { "type": "draw", "value": 1 }
+      { "type": "damage", "value": 8 },
+      { "type": "applyStatus", "statusId": "Poison", "value": 2 }
     ],
     "upgrade": {
       "branchA": {
-        "name": "前排强化",
-        "description": "【前排】造成 9 点伤害，恢复 5 点生命。\n【后排】造成 10 点伤害，抽 1 张牌。"
+        "name": "前线回血",
+        "description": "【前排】造成 10 点伤害，恢复 6 点生命。\n【后排】造成 8 点伤害，施加 2 层毒素。"
       },
       "branchB": {
-        "name": "后排强化",
-        "description": "【前排】造成 6 点伤害，恢复 3 点生命。\n【后排】造成 14 点伤害，抽 1 张牌。"
+        "name": "后排毒化",
+        "description": "【前排】造成 8 点伤害，恢复 4 点生命。\n【后排】造成 10 点伤害，施加 3 层毒素。"
       }
     }
   },
@@ -129,6 +125,7 @@
     "id": "glitch",
     "name": "故障程序",
     "nameEn": "Glitch",
+    "artPath": "netrunner/glitch.svg",
     "class": "netrunner",
     "rarity": "common",
     "type": "curse",
@@ -140,5 +137,410 @@
     "effects": [
       { "type": "damage", "value": 2 }
     ]
+  },
+
+  {
+    "id": "strike_and_withdraw",
+    "name": "进退合击",
+    "nameEn": "Strike & Withdraw",
+    "artPath": "vanguard/strike_withdraw.svg",
+    "class": "vanguard",
+    "rarity": "uncommon",
+    "type": "attack",
+    "cost": 2,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "【前排】对目标造成 14 点伤害，自身失去 3 点生命。\n【后排】对目标造成 7 点伤害，获得 7 点护甲。",
+    "frontEffects": [
+      { "type": "damage", "value": 14 },
+      { "type": "selfdamage", "value": 3 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 7 },
+      { "type": "block", "value": 7 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "凶刃进退",
+        "description": "【前排】对目标造成 18 点伤害，自身失去 3 点生命。\n【后排】对目标造成 7 点伤害，获得 7 点护甲。"
+      },
+      "branchB": {
+        "name": "磐石进退",
+        "description": "【前排】对目标造成 14 点伤害，自身失去 2 点生命。\n【后排】对目标造成 7 点伤害，获得 11 点护甲。"
+      }
+    }
+  },
+  {
+    "id": "shield_wall",
+    "name": "铁壁阵线",
+    "nameEn": "Shield Wall",
+    "artPath": "vanguard/shield_wall.svg",
+    "class": "vanguard",
+    "rarity": "common",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】获得 8 点护甲，对目标造成 4 点伤害。\n【后排】获得 12 点护甲，获得 1 层力量。",
+    "frontEffects": [
+      { "type": "block", "value": 8 },
+      { "type": "damage", "value": 4 }
+    ],
+    "backEffects": [
+      { "type": "block", "value": 12 },
+      { "type": "status", "statusId": "Strength", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "强攻壁垒",
+        "description": "【前排】获得 8 点护甲，对目标造成 7 点伤害。\n【后排】获得 12 点护甲，获得 1 层力量。"
+      },
+      "branchB": {
+        "name": "固守壁垒",
+        "description": "【前排】获得 12 点护甲，对目标造成 4 点伤害。\n【后排】获得 16 点护甲，获得 1 层力量。"
+      }
+    }
+  },
+  {
+    "id": "overcharge_blast",
+    "name": "超载轰击",
+    "nameEn": "Overcharge Blast",
+    "artPath": "vanguard/overcharge_blast.svg",
+    "class": "vanguard",
+    "rarity": "uncommon",
+    "type": "attack",
+    "cost": 2,
+    "range": "melee",
+    "targetType": "allEnemies",
+    "description": "【前排】对所有敌人造成 8 点伤害，消耗 3 点生命。\n【后排】对单个目标造成 6 点伤害，获得 2 点能量。",
+    "frontEffects": [
+      { "type": "damage", "value": 8 },
+      { "type": "selfdamage", "value": 3 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 6 },
+      { "type": "energy", "value": 2 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "暴烈轰击",
+        "description": "【前排】对所有敌人造成 12 点伤害，消耗 3 点生命。\n【后排】对单个目标造成 6 点伤害，获得 2 点能量。"
+      },
+      "branchB": {
+        "name": "高效轰击",
+        "description": "【前排】对所有敌人造成 8 点伤害，消耗 2 点生命。\n【后排】对单个目标造成 6 点伤害，获得 3 点能量。"
+      }
+    }
+  },
+  {
+    "id": "overcharge_surge",
+    "name": "超载涌动",
+    "nameEn": "Overcharge Surge",
+    "artPath": "vanguard/overcharge_surge.svg",
+    "class": "vanguard",
+    "rarity": "rare",
+    "type": "attack",
+    "cost": 3,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "【前排】消耗所有超载层数，每层造成 5 点额外伤害。\n【后排】造成 6 点伤害，获得等同于伤害的护甲。",
+    "frontEffects": [
+      { "type": "overchargeConsume", "baseDamage": 0, "damagePerStack": 5 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 6 },
+      { "type": "block", "value": 6 }
+    ],
+    "keywords": ["overcharge"],
+    "upgrade": {
+      "branchA": {
+        "name": "超载核爆",
+        "description": "【前排】消耗所有超载层数，每层造成 7 点额外伤害。\n【后排】造成 6 点伤害，获得 6 点护甲。"
+      },
+      "branchB": {
+        "name": "铁壁涌动",
+        "description": "【前排】消耗所有超载层数，每层造成 5 点额外伤害。\n【后排】造成 8 点伤害，获得 8 点护甲。"
+      }
+    }
+  },
+  {
+    "id": "resonance_echo",
+    "name": "共鸣回响",
+    "nameEn": "Resonance Echo",
+    "artPath": "psion/resonance_echo.svg",
+    "class": "psion",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 1,
+    "range": "ranged",
+    "targetType": "singleEnemy",
+    "description": "【前排】造成共鸣层数×3 点伤害，施加 1 层易伤。\n【后排】获得共鸣层数×2 点护甲，抽 1 张牌。",
+    "frontEffects": [
+      { "type": "resonanceDamage", "baseDamage": 0, "multiplier": 3 },
+      { "type": "status", "statusId": "Vulnerable", "value": 1 }
+    ],
+    "backEffects": [
+      { "type": "resonanceBlock", "multiplier": 2 },
+      { "type": "draw", "value": 1 }
+    ],
+    "keywords": ["resonance"],
+    "upgrade": {
+      "branchA": {
+        "name": "侵蚀回响",
+        "description": "【前排】造成共鸣层数×4 点伤害，施加 2 层易伤。\n【后排】获得共鸣层数×2 点护甲，抽 1 张牌。"
+      },
+      "branchB": {
+        "name": "守护回响",
+        "description": "【前排】造成共鸣层数×3 点伤害，施加 1 层易伤。\n【后排】获得共鸣层数×3 点护甲，抽 1 张牌。"
+      }
+    }
+  },
+  {
+    "id": "mind_blast",
+    "name": "精神冲击",
+    "nameEn": "Mind Blast",
+    "artPath": "psion/mind_blast.svg",
+    "class": "psion",
+    "rarity": "uncommon",
+    "type": "attack",
+    "cost": 2,
+    "range": "ranged",
+    "targetType": "singleEnemy",
+    "description": "【前排】造成 12 点伤害，消耗所有共鸣层数。\n【后排】造成 6 点伤害，获得 2 层共鸣。",
+    "frontEffects": [
+      { "type": "damage", "value": 12 },
+      { "type": "clearResonance" }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 6 },
+      { "type": "status", "statusId": "Resonance", "value": 2 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "毁灭冲击",
+        "description": "【前排】造成 16 点伤害，消耗所有共鸣层数。\n【后排】造成 6 点伤害，获得 2 层共鸣。"
+      },
+      "branchB": {
+        "name": "蓄力冲击",
+        "description": "【前排】造成 12 点伤害，消耗所有共鸣层数。\n【后排】造成 6 点伤害，获得 3 层共鸣。"
+      }
+    }
+  },
+  {
+    "id": "data_siphon",
+    "name": "数据虹吸",
+    "nameEn": "Data Siphon",
+    "artPath": "netrunner/data_siphon.svg",
+    "class": "netrunner",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】施加 2 层入侵进度，获得 1 点能量。\n【后排】抽 2 张牌，获得 1 点能量。",
+    "frontEffects": [
+      { "type": "hack", "value": 2 },
+      { "type": "energy", "value": 1 }
+    ],
+    "backEffects": [
+      { "type": "draw", "value": 2 },
+      { "type": "energy", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "深度虹吸",
+        "description": "【前排】施加 3 层入侵进度，获得 1 点能量。\n【后排】抽 2 张牌，获得 1 点能量。"
+      },
+      "branchB": {
+        "name": "广域虹吸",
+        "description": "【前排】施加 2 层入侵进度，获得 2 点能量。\n【后排】抽 3 张牌，获得 1 点能量。"
+      }
+    }
+  },
+  {
+    "id": "signal_jam",
+    "name": "信号干扰",
+    "nameEn": "Signal Jam",
+    "artPath": "netrunner/signal_jam.svg",
+    "class": "netrunner",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 2,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】对所有敌人施加 2 层虚弱。\n【后排】对单个目标施加 1 层易伤和 1 层虚弱，抽 1 张牌。",
+    "frontEffects": [
+      { "type": "status", "statusId": "Weak", "value": 2 }
+    ],
+    "backEffects": [
+      { "type": "status", "statusId": "Vulnerable", "value": 1 },
+      { "type": "status", "statusId": "Weak", "value": 1 },
+      { "type": "draw", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "全面压制",
+        "description": "【前排】对所有敌人施加 3 层虚弱。\n【后排】对单个目标施加 1 层易伤和 1 层虚弱，抽 1 张牌。"
+      },
+      "branchB": {
+        "name": "精准干扰",
+        "description": "【前排】对所有敌人施加 2 层虚弱。\n【后排】对单个目标施加 2 层易伤和 1 层虚弱，抽 1 张牌。"
+      }
+    }
+  },
+  {
+    "id": "parasitic_lash",
+    "name": "寄生鞭击",
+    "nameEn": "Parasitic Lash",
+    "artPath": "symbiote/parasitic_lash.svg",
+    "class": "symbiote",
+    "rarity": "uncommon",
+    "type": "attack",
+    "cost": 2,
+    "range": "melee",
+    "targetType": "singleEnemy",
+    "description": "【前排】造成 10 点伤害，恢复等同于造成伤害 50% 的生命。\n【后排】造成 5 点伤害，施加 3 层毒素。",
+    "frontEffects": [
+      { "type": "damage", "value": 10 },
+      { "type": "lifesteal", "percent": 50 }
+    ],
+    "backEffects": [
+      { "type": "damage", "value": 5 },
+      { "type": "status", "statusId": "Poison", "value": 3 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "吞噬鞭击",
+        "description": "【前排】造成 14 点伤害，恢复等同于造成伤害 50% 的生命。\n【后排】造成 5 点伤害，施加 3 层毒素。"
+      },
+      "branchB": {
+        "name": "毒化鞭击",
+        "description": "【前排】造成 10 点伤害，恢复等同于造成伤害 50% 的生命。\n【后排】造成 5 点伤害，施加 5 层毒素。"
+      }
+    }
+  },
+  {
+    "id": "toxic_bloom",
+    "name": "毒绽",
+    "nameEn": "Toxic Bloom",
+    "artPath": "symbiote/toxic_bloom.svg",
+    "class": "symbiote",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 2,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】对所有敌人施加 2 层毒素，自身失去 3 点生命。\n【后排】对单个目标施加 4 层毒素，抽 1 张牌。",
+    "frontEffects": [
+      { "type": "status", "statusId": "Poison", "value": 2 },
+      { "type": "selfdamage", "value": 3 }
+    ],
+    "backEffects": [
+      { "type": "status", "statusId": "Poison", "value": 4 },
+      { "type": "draw", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "蔓延毒绽",
+        "description": "【前排】对所有敌人施加 3 层毒素，自身失去 3 点生命。\n【后排】对单个目标施加 4 层毒素，抽 1 张牌。"
+      },
+      "branchB": {
+        "name": "浓缩毒绽",
+        "description": "【前排】对所有敌人施加 2 层毒素，自身失去 3 点生命。\n【后排】对单个目标施加 6 层毒素，抽 1 张牌。"
+      }
+    }
+  },
+  {
+    "id": "battle_rhythm",
+    "name": "战律节奏",
+    "nameEn": "Battle Rhythm",
+    "artPath": "neutral/battle_rhythm.svg",
+    "class": "neutral",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "self",
+    "description": "【前排】获得 2 层力量和 1 层敏捷。\n【后排】抽 2 张牌，获得 1 点能量。",
+    "frontEffects": [
+      { "type": "status", "statusId": "Strength", "value": 2 },
+      { "type": "status", "statusId": "Dexterity", "value": 1 }
+    ],
+    "backEffects": [
+      { "type": "draw", "value": 2 },
+      { "type": "energy", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "攻势节奏",
+        "description": "【前排】获得 3 层力量和 1 层敏捷。\n【后排】抽 2 张牌，获得 1 点能量。"
+      },
+      "branchB": {
+        "name": "变速节奏",
+        "description": "【前排】获得 2 层力量和 1 层敏捷。\n【后排】抽 3 张牌，获得 1 点能量。"
+      }
+    }
+  },
+  {
+    "id": "tactical_shift",
+    "name": "战术转移",
+    "nameEn": "Tactical Shift",
+    "artPath": "neutral/tactical_shift.svg",
+    "class": "neutral",
+    "rarity": "common",
+    "type": "skill",
+    "cost": 0,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】退入后排，获得 4 点护甲。\n【后排】移入前排，对目标造成 4 点伤害。",
+    "frontEffects": [
+      { "type": "selfreposition", "value": 1 },
+      { "type": "block", "value": 4 }
+    ],
+    "backEffects": [
+      { "type": "selfreposition", "value": 0 },
+      { "type": "damage", "value": 4 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "坚壁转移",
+        "description": "【前排】退入后排，获得 7 点护甲。\n【后排】移入前排，对目标造成 4 点伤害。"
+      },
+      "branchB": {
+        "name": "突袭转移",
+        "description": "【前排】退入后排，获得 4 点护甲。\n【后排】移入前排，对目标造成 7 点伤害。"
+      }
+    }
+  },
+  {
+    "id": "position_lock",
+    "name": "阵位锁定",
+    "nameEn": "Position Lock",
+    "artPath": "neutral/position_lock.svg",
+    "class": "neutral",
+    "rarity": "uncommon",
+    "type": "skill",
+    "cost": 1,
+    "range": "none",
+    "targetType": "singleEnemy",
+    "description": "【前排】对目标造成 6 点伤害，施加 1 层根须（无法切换行）。\n【后排】获得 10 点护甲，获得 1 层再生。",
+    "frontEffects": [
+      { "type": "damage", "value": 6 },
+      { "type": "status", "statusId": "Rooted", "value": 1 }
+    ],
+    "backEffects": [
+      { "type": "block", "value": 10 },
+      { "type": "status", "statusId": "Regeneration", "value": 1 }
+    ],
+    "upgrade": {
+      "branchA": {
+        "name": "铁钉阵位",
+        "description": "【前排】对目标造成 8 点伤害，施加 2 层根须。\n【后排】获得 10 点护甲，获得 1 层再生。"
+      },
+      "branchB": {
+        "name": "堡垒阵位",
+        "description": "【前排】对目标造成 6 点伤害，施加 1 层根须。\n【后排】获得 14 点护甲，获得 2 层再生。"
+      }
+    }
   }
 ]

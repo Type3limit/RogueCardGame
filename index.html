@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solari Split-Flap Display</title>
+<style>
+:root {
+  --flip-duration: 0.25s;
+  --char-w: 28px;
+  --char-h: 44px;
+  --gap: 2px;
+  --bg: #1a1a1a;
+  --flap-bg: #2a2a2a;
+  --flap-text: #fff;
+  --row-yellow-bg: #3a3000;
+  --row-yellow-text: #ffd700;
+  --row-white-bg: #2a2a2a;
+  --row-white-text: #ffffff;
+  --row-red-bg: #3a1010;
+  --row-red-text: #ff4444;
+  --border-color: #555;
+  --pivot-color: #333;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: 'Courier New', monospace;
+  color: var(--flap-text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#display {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.display-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: #111;
+  border-bottom: 2px solid #444;
+  flex-shrink: 0;
+  height: 48px;
+  gap: 12px;
+}
+
+.style-icon {
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+.style-icon:hover { opacity: 1; }
+.style-icon.active { opacity: 1; }
+
+.display-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.display-row {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.row-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.row-entries {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+  min-height: var(--char-h);
+}
+
+.entry-fields {
+  display: flex;
+  gap: 1px;
+  flex: 1;
+}
+
+.field {
+  display: flex;
+  gap: var(--gap);
+  flex-shrink: 0;
+}
+
+/* ── Split-Flap Cell ── */
+.flap-cell {
+  width: var(--char-w);
+  height: var(--char-h);
+  position: relative;
+  perspective: 300px;
+  overflow: hidden;
+}
+
+.flap-half {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  background: var(--flap-bg);
+}
+
+.flap-half.top {
+  top: 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.flap-half.bottom {
+  top: 50%;
+  border-top: 1px solid var(--border-color);
+}
+
+.flap-char {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: var(--char-h);
+  line-height: var(--char-h);
+  text-align: center;
+  font-size: 26px;
+  font-weight: bold;
+  color: var(--flap-text);
+}
+
+.flap-half.top .flap-char {
+  top: 0;
+}
+
+.flap-half.bottom .flap-char {
+  top: calc(-1 * var(--char-h) / 2);
+}
+
+/* ── Flip animation layers ── */
+.flip-layer {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  z-index: 2;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.flip-layer .flap-char {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: var(--char-h);
+  line-height: var(--char-h);
+  text-align: center;
+  font-size: 26px;
+  font-weight: bold;
+  color: var(--flap-text);
+}
+
+.flip-out {
+  top: 0;
+  transform-origin: bottom center;
+  background: var(--flap-bg);
+}
+
+.flip-out .flap-char { top: 0; }
+
+.flip-in {
+  top: 50%;
+  transform-origin: top center;
+  background: var(--flap-bg);
+  transform: rotateX(90deg);
+}
+
+.flip-in .flap-char { top: calc(-1 * var(--char-h) / 2); }
+
+/* Pivot bar */
+.flap-cell::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 1px;
+  background: var(--pivot-color);
+  z-index: 5;
+  transform: translateY(-0.5px);
+}
+
+/* ── Flip animation keyframes ── */
+@keyframes flipOut {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(-90deg); }
+}
+
+@keyframes flipIn {
+  0% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); }
+}
+
+.flipping .flip-out {
+  animation: flipOut calc(var(--flip-duration) / 2) ease-in forwards;
+}
+
+.flipping .flip-in {
+  animation: flipIn calc(var(--flip-duration) / 2) ease-out calc(var(--flip-duration) / 2) forwards;
+}
+
+/* ── Row color variants ── */
+.row-departure .flap-cell .flap-half,
+.row-departure .flip-layer { background: var(--row-yellow-bg); }
+.row-departure .flap-char { color: var(--row-yellow-text); }
+
+.row-arrival .flap-cell .flap-half,
+.row-arrival .flip-layer { background: var(--row-white-bg); }
+.row-arrival .flap-char { color: var(--row-white-text); }
+
+.row-message .flap-cell .flap-half,
+.row-message .flip-layer { background: var(--row-red-bg); }
+.row-message .flap-char { color: var(--row-red-text); }
+
+/* ── Layout styles ── */
+
+/* LINE style: trapezoid */
+.layout-line .display-body {
+  gap: 4px;
+}
+
+.layout-line .entry {
+  padding-left: 20px;
+}
+
+/* GRID style */
+.layout-grid .display-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.layout-grid .display-row {
+  min-height: unset;
+}
+
+/* ── Hour marker ── */
+.hour-marker {
+  display: flex;
+  align-items: center;
+  padding: 2px 12px;
+  font-size: 10px;
+  color: #888;
+  background: #111;
+  border-top: 1px solid #333;
+  flex-shrink: 0;
+  height: 20px;
+}
+
+.hour-marker::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #333;
+  margin-left: 8px;
+}
+
+/* ── Scrollbar hidden ── */
+.row-entries::-webkit-scrollbar { display: none; }
+.row-entries { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Vertical centering ── */
+.row-entries.centered {
+  justify-content: center;
+}
+
+/* ── Single row mode ── */
+.display-row.collapsed {
+  flex: 0;
+  min-height: 0;
+  display: none;
+}
+
+/* ── Selection highlight ── */
+.entry.selected {
+  outline: 1px solid #ffd700;
+  outline-offset: -1px;
+}
+</style>
+</head>
+<body>
+
+<div id="display">
+  <div class="display-header">
+    <svg id="icon-line" class="style-icon active" viewBox="0 0 32 32" title="Line Layout">
+      <polygon points="4,28 12,4 20,4 28,28" fill="none" stroke="#ffd700" stroke-width="2"/>
+    </svg>
+    <svg id="icon-grid" class="style-icon" viewBox="0 0 32 32" title="Grid Layout">
+      <rect x="4" y="4" width="10" height="10" fill="#ffd700" rx="1"/>
+      <rect x="18" y="4" width="10" height="10" fill="#ffd700" rx="1"/>
+      <rect x="4" y="18" width="10" height="10" fill="#ffd700" rx="1"/>
+      <rect x="18" y="18" width="10" height="10" fill="#ffd700" rx="1"/>
+    </svg>
+    <svg id="icon-custom" class="style-icon" viewBox="0 0 32 32" title="Custom Layout">
+      <rect x="2" y="8" width="28" height="4" fill="#ffd700" rx="1"/>
+      <rect x="8" y="16" width="22" height="4" fill="#ffd700" rx="1"/>
+      <rect x="4" y="24" width="26" height="4" fill="#ffd700" rx="1"/>
+    </svg>
+  </div>
+
+  <div class="display-body" id="display-body">
+    <div class="display-row row-departure" id="row-departure">
+      <div class="row-header" style="background:#3a3000;color:#ffd700;">PARTENZE</div>
+      <div class="row-entries centered" id="entries-departure"></div>
+    </div>
+    <div class="display-row row-arrival" id="row-arrival">
+      <div class="row-header" style="background:#222;color:#fff;">ARRIVI</div>
+      <div class="row-entries centered" id="entries-arrival"></div>
+    </div>
+    <div class="display-row row-message" id="row-message">
+      <div class="row-header" style="background:#3a1010;color:#ff4444;">NOTIZIE</div>
+      <div class="row-entries centered" id="entries-message"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ═══════════════════════════════════════════
+   *  CONFIGURATION & STATE
+   * ═══════════════════════════════════════════ */
+
+  const params = new URLSearchParams(window.location.search);
+
+  const cfg = {
+    rows: 10,
+    columns: 40,
+    selection: false,
+    layout: 'line',
+    iconClick: null,
+  };
+
+  // Apply URL params
+  if (params.has('rows'))    cfg.rows    = clamp(parseInt(params.get('rows')), 1, 50);
+  if (params.has('columns')) cfg.columns = clamp(parseInt(params.get('columns')), 1, 80);
+  if (params.has('selection')) cfg.selection = params.get('selection') === 'true';
+  if (params.has('layout'))  cfg.layout  = params.get('layout');
+  if (params.has('icon-click')) cfg.iconClick = params.get('icon-click');
+
+  const state = {
+    layout: cfg.layout,
+    displayRows: { departure: cfg.rows, arrival: cfg.rows, message: cfg.rows },
+    selectedEntry: null,
+    entries: { departure: [], arrival: [], message: [] },
+    currentHour: null,
+  };
+
+  /* ═══════════════════════════════════════════
+   *  FLAP CHARACTER SET
+   * ═══════════════════════════════════════════ */
+
+  const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:-/\'()';
+
+  /* ═══════════════════════════════════════════
+   *  ICON CLICK HANDLERS
+   * ═══════════════════════════════════════════ */
+
+  const layoutCycle = ['line', 'grid', 'custom'];
+  let cycleIndex = 0;
+
+  function handleIconClick(iconType) {
+    if (cfg.iconClick === 'custom' && window.__splitFlapCustomIconClick) {
+      window.__splitFlapCustomIconClick(iconType);
+      return;
+    }
+    if (cfg.iconClick === 'cycle') {
+      cycleIndex = (cycleIndex + 1) % layoutCycle.length;
+      applyLayout(layoutCycle[cycleIndex]);
+      return;
+    }
+    // Default: switch directly
+    applyLayout(iconType);
+  }
+
+  document.getElementById('icon-line').addEventListener('click', () => handleIconClick('line'));
+  document.getElementById('icon-grid').addEventListener('click', () => handleIconClick('grid'));
+  document.getElementById('icon-custom').addEventListener('click', () => handleIconClick('custom'));
+
+  /* ═══════════════════════════════════════════
+   *  LAYOUT MANAGEMENT
+   * ═══════════════════════════════════════════ */
+
+  function applyLayout(layout) {
+    state.layout = layout;
+    const body = document.getElementById('display-body');
+    body.className = 'display-body layout-' + layout;
+    document.querySelectorAll('.style-icon').forEach(i => i.classList.remove('active'));
+    const icon = document.getElementById('icon-' + layout);
+    if (icon) icon.classList.add('active');
+    rebuildDisplay();
+  }
+
+  /* ═══════════════════════════════════════════
+   *  FLAP CELL CREATION & ANIMATION
+   * ═══════════════════════════════════════════ */
+
+  function createFlapCell() {
+    const cell = document.createElement('div');
+    cell.className = 'flap-cell';
+    cell.dataset.char = ' ';
+
+    const top = document.createElement('div');
+    top.className = 'flap-half top';
+    const topChar = document.createElement('span');
+    topChar.className = 'flap-char';
+    topChar.textContent = ' ';
+    top.appendChild(topChar);
+
+    const bottom = document.createElement('div');
+    bottom.className = 'flap-half bottom';
+    const bottomChar = document.createElement('span');
+    bottomChar.className = 'flap-char';
+    bottomChar.textContent = ' ';
+    bottom.appendChild(bottomChar);
+
+    cell.appendChild(top);
+    cell.appendChild(bottom);
+
+    cell._topChar = topChar;
+    cell._bottomChar = bottomChar;
+    cell._flipping = false;
+    cell._queue = null;
+
+    return cell;
+  }
+
+  function flipCellTo(cell, targetChar, callback) {
+    if (targetChar === cell.dataset.char) {
+      if (callback) callback();
+      return;
+    }
+
+    if (cell._flipping) {
+      cell._queue = targetChar;
+      cell._queueCb = callback;
+      return;
+    }
+
+    cell._flipping = true;
+    const oldChar = cell.dataset.char;
+    const newChar = targetChar;
+
+    // Show old char on the flip-out layer, new char on flip-in
+    const flipOut = document.createElement('div');
+    flipOut.className = 'flip-layer flip-out';
+    const flipOutChar = document.createElement('span');
+    flipOutChar.className = 'flap-char';
+    flipOutChar.textContent = oldChar;
+    flipOut.appendChild(flipOutChar);
+
+    const flipIn = document.createElement('div');
+    flipIn.className = 'flip-layer flip-in';
+    const flipInChar = document.createElement('span');
+    flipInChar.className = 'flap-char';
+    flipInChar.textContent = newChar;
+    flipIn.appendChild(flipInChar);
+
+    cell.appendChild(flipOut);
+    cell.appendChild(flipIn);
+
+    // Update the static bottom half immediately to new char
+    cell._bottomChar.textContent = newChar;
+
+    // Start animation
+    cell.classList.add('flipping');
+
+    const duration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--flip-duration')) * 1000 || 250;
+
+    setTimeout(() => {
+      // Remove animation layers
+      flipOut.remove();
+      flipIn.remove();
+      cell.classList.remove('flipping');
+
+      // Update static halves
+      cell._topChar.textContent = newChar;
+      cell._bottomChar.textContent = newChar;
+      cell.dataset.char = newChar;
+      cell._flipping = false;
+
+      if (cell._queue !== null) {
+        const next = cell._queue;
+        const nextCb = cell._queueCb;
+        cell._queue = null;
+        cell._queueCb = null;
+        flipCellTo(cell, next, nextCb);
+      } else if (callback) {
+        callback();
+      }
+    }, duration);
+  }
+
+  function flipFieldTo(field, targetText, onDone) {
+    const cells = field.querySelectorAll('.flap-cell');
+    const padded = targetText.toUpperCase().padEnd(cells.length, ' ').slice(0, cells.length);
+    let remaining = cells.length;
+    if (remaining === 0 && onDone) { onDone(); return; }
+
+    cells.forEach((cell, i) => {
+      flipCellTo(cell, padded[i], () => {
+        remaining--;
+        if (remaining === 0 && onDone) onDone();
+      });
+    });
+  }
+
+  function createField(width) {
+    const field = document.createElement('div');
+    field.className = 'field';
+    for (let i = 0; i < width; i++) {
+      field.appendChild(createFlapCell());
+    }
+    return field;
+  }
+
+  /* ═══════════════════════════════════════════
+   *  ENTRY CREATION
+   * ═══════════════════════════════════════════ */
+
+  function createEntry(type, fieldWidths, index) {
+    const entry = document.createElement('div');
+    entry.className = 'entry';
+    entry.dataset.type = type;
+    entry.dataset.index = index;
+
+    const fields = document.createElement('div');
+    fields.className = 'entry-fields';
+
+    fieldWidths.forEach((w, fi) => {
+      const field = createField(w);
+      field.dataset.field = fi;
+      fields.appendChild(field);
+    });
+
+    entry.appendChild(fields);
+
+    if (cfg.selection) {
+      entry.addEventListener('click', () => {
+        document.querySelectorAll('.entry.selected').forEach(e => e.classList.remove('selected'));
+        entry.classList.add('selected');
+        state.selectedEntry = { type, index };
+      });
+    }
+
+    return entry;
+  }
+
+  function getFieldWidths(type, totalCols) {
+    // Distribute columns across fields
+    // time: 5 | 1  | destination: ~18 | platform: 4 | delay: 5 | free: rest
+    if (totalCols < 15) {
+      return [totalCols]; // single field
+    }
+
+    const time = 5;
+    const sep1 = 1;
+    const platform = totalCols >= 30 ? 4 : 3;
+    const delay = totalCols >= 30 ? 5 : 4;
+    const sep2 = 1;
+    const dest = totalCols - time - sep1 - platform - delay - sep2;
+
+    if (type === 'message') {
+      return [totalCols];
+    }
+
+    return [time, sep1, dest, platform, delay];
+  }
+
+  /* ═══════════════════════════════════════════
+   *  HOUR MARKER
+   * ═══════════════════════════════════════════ */
+
+  function createHourMarker(hour) {
+    const marker = document.createElement('div');
+    marker.className = 'hour-marker';
+    marker.textContent = String(hour).padStart(2, '0') + ':00';
+    return marker;
+  }
+
+  function updateClockMarkers() {
+    const now = new Date();
+    const hour = now.getHours();
+    if (hour !== state.currentHour) {
+      state.currentHour = hour;
+      document.querySelectorAll('.hour-marker').forEach(m => {
+        m.textContent = String(hour).padStart(2, '0') + ':00';
+      });
+    }
+  }
+
+  setInterval(updateClockMarkers, 1000);
+
+  /* ═══════════════════════════════════════════
+   *  DISPLAY REBUILD
+   * ═══════════════════════════════════════════ */
+
+  function rebuildDisplay() {
+    const rows = state.displayRows;
+    const totalRows = rows.departure + rows.arrival + rows.message;
+
+    ['departure', 'arrival', 'message'].forEach(type => {
+      const container = document.getElementById('entries-' + type);
+      container.innerHTML = '';
+
+      // Insert hour marker
+      const now = new Date();
+      state.currentHour = now.getHours();
+      container.appendChild(createHourMarker(state.currentHour));
+
+      const rowEl = document.getElementById('row-' + type);
+      rowEl.classList.toggle('collapsed', rows[type] <= 0);
+
+      const widths = getFieldWidths(type, cfg.columns);
+
+      state.entries[type] = [];
+      for (let i = 0; i < rows[type]; i++) {
+        const entry = createEntry(type, widths, i);
+        container.appendChild(entry);
+        state.entries[type].push(entry);
+      }
+    });
+  }
+
+  /* ═══════════════════════════════════════════
+   *  TOUCH SCROLLING
+   * ═══════════════════════════════════════════ */
+
+  document.getElementById('display-body').addEventListener('wheel', (e) => {
+    // Allow natural scroll on the row-entries containers
+    const target = e.target.closest('.row-entries');
+    if (target) {
+      target.scrollTop += e.deltaY;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // Touch scroll support
+  let touchStartY = 0;
+  let touchTarget = null;
+
+  document.getElementById('display-body').addEventListener('touchstart', (e) => {
+    touchTarget = e.target.closest('.row-entries');
+    if (touchTarget) {
+      touchStartY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  document.getElementById('display-body').addEventListener('touchmove', (e) => {
+    if (touchTarget) {
+      const dy = touchStartY - e.touches[0].clientY;
+      touchTarget.scrollTop += dy;
+      touchStartY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  document.getElementById('display-body').addEventListener('touchend', () => {
+    touchTarget = null;
+  }, { passive: true });
+
+  /* ═══════════════════════════════════════════
+   *  RUNTIME API
+   * ═══════════════════════════════════════════ */
+
+  const api = {
+    /**
+     * Set number of rows for each display section.
+     * @param {number|{departure?:number, arrival?: number, message?: number}} rows
+     */
+    setRows(rows) {
+      if (typeof rows === 'number') {
+        state.displayRows = { departure: rows, arrival: rows, message: rows };
+      } else {
+        if (rows.departure !== undefined) state.displayRows.departure = clamp(rows.departure, 0, 50);
+        if (rows.arrival !== undefined)   state.displayRows.arrival   = clamp(rows.arrival, 0, 50);
+        if (rows.message !== undefined)   state.displayRows.message   = clamp(rows.message, 0, 50);
+      }
+      rebuildDisplay();
+    },
+
+    /**
+     * Set number of character columns.
+     * @param {number} cols
+     */
+    setColumns(cols) {
+      cfg.columns = clamp(cols, 1, 80);
+      rebuildDisplay();
+    },
+
+    /**
+     * Enable/disable entry selection.
+     * @param {boolean} on
+     */
+    setSelection(on) {
+      cfg.selection = !!on;
+      rebuildDisplay();
+    },
+
+    /**
+     * Set the current layout.
+     * @param {'line'|'grid'|'custom'|string} layout
+     */
+    setLayout(layout) {
+      applyLayout(layout);
+    },
+
+    /**
+     * Set a display entry.
+     * @param {'departure'|'arrival'|'message'} type
+     * @param {number} row  - row index (0-based)
+     * @param {object} data - { time, destination, platform, delay }
+     */
+    setEntry(type, row, data) {
+      const entries = state.entries[type];
+      if (!entries || !entries[row]) return;
+
+      const entry = entries[row];
+      const fields = entry.querySelectorAll('.field');
+
+      if (type === 'message') {
+        const msg = (data.text || data.destination || '').toUpperCase();
+        flipFieldTo(fields[0], msg);
+      } else {
+        const time  = (data.time || '     ').toUpperCase();
+        const dest  = (data.destination || '').toUpperCase();
+        const plat  = (data.platform || '').toUpperCase();
+        const delay = (data.delay || '').toUpperCase();
+        // field[0] = time, field[1] = sep, field[2] = dest, field[3] = platform, field[4] = delay
+        if (fields[0]) flipFieldTo(fields[0], time);
+        if (fields[1]) flipFieldTo(fields[1], ' ');
+        if (fields[2]) flipFieldTo(fields[2], dest);
+        if (fields[3]) flipFieldTo(fields[3], plat);
+        if (fields[4]) flipFieldTo(fields[4], delay);
+      }
+    },
+
+    /**
+     * Set custom CSS variables.
+     * @param {object} vars - CSS variable names (without --) to values
+     */
+    setStyle(vars) {
+      const root = document.documentElement.style;
+      Object.entries(vars).forEach(([k, v]) => {
+        root.setProperty('--' + k, v);
+      });
+    },
+
+    /**
+     * Get the currently selected entry.
+     * @returns {{type: string, index: number}|null}
+     */
+    getSelection() {
+      return state.selectedEntry ? { ...state.selectedEntry } : null;
+    },
+
+    /**
+     * Clear all entries in a section.
+     * @param {'departure'|'arrival'|'message'} type
+     */
+    clearAll(type) {
+      (state.entries[type] || []).forEach(entry => {
+        entry.querySelectorAll('.field').forEach(field => {
+          flipFieldTo(field, '');
+        });
+      });
+    },
+
+    /**
+     * Register a custom icon click handler.
+     * @param {function(string): void} fn - receives 'line'|'grid'|'custom'
+     */
+    onIconClick(fn) {
+      window.__splitFlapCustomIconClick = fn;
+    },
+  };
+
+  window.splitFlap = api;
+
+  /* ═══════════════════════════════════════════
+   *  DEMO DATA
+   * ═══════════════════════════════════════════ */
+
+  function randomTime() {
+    const h = String(Math.floor(Math.random() * 24)).padStart(2, '0');
+    const m = String(Math.floor(Math.random() * 60 / 5) * 5).padStart(2, '0');
+    return h + ':' + m;
+  }
+
+  const cities = [
+    'ROMA TERMINI', 'FIRENZE SMN', 'VENEZIA SL', 'MILANO CC',
+    'NAPOLI CENTR', 'BOLOGNA CLE', 'TORINO P.N', 'GENOVA PP',
+    'BERN', 'MUNCHEN HBF', 'WIEN HBF', 'PARIS LYON',
+    'BARCELONA', 'LISBOA ORIE', 'ZURICH HB', 'LONDON STP',
+  ];
+
+  const platforms = ['1', '2', '3', '4', '5', '6', '7', '8', '9A', '10B', '11', 'S5'];
+  const delays = ['', '', '', '', ' +5', ' +10', ' +2', ' -', ' +20', ' C.C.'];
+  const messages = [
+    'ATTENZIONE ALLE VOSTRE COSE PERSONALI',
+    'IN CASO DI RITARDO CONTATTARE INFOPOINT',
+    'VIAGGIO PIACEVOLE DA TRENITALIA',
+    'MASCHERINA OBBLIGATORIA SUI TRENI',
+    'AREA RISTORO AL PIANO SUPERIORE',
+    'SERVIZIO WIFI GRATUITO DISPONIBILE',
+  ];
+
+  function populateDemo() {
+    ['departure', 'arrival'].forEach(type => {
+      const entries = state.entries[type];
+      entries.forEach((entry, i) => {
+        const city = cities[Math.floor(Math.random() * cities.length)];
+        api.setEntry(type, i, {
+          time: randomTime(),
+          destination: city,
+          platform: platforms[Math.floor(Math.random() * platforms.length)],
+          delay: delays[Math.floor(Math.random() * delays.length)],
+        });
+      });
+    });
+
+    const msgEntries = state.entries.message;
+    msgEntries.forEach((entry, i) => {
+      api.setEntry('message', i, {
+        text: messages[i % messages.length],
+      });
+    });
+  }
+
+  /* ═══════════════════════════════════════════
+   *  INIT
+   * ═══════════════════════════════════════════ */
+
+  applyLayout(state.layout);
+
+  // Populate demo data after a short delay so flaps are visible
+  setTimeout(populateDemo, 300);
+
+  // Random flip demo every 3 seconds
+  setInterval(() => {
+    const types = ['departure', 'arrival'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const entries = state.entries[type];
+    if (entries.length === 0) return;
+    const idx = Math.floor(Math.random() * entries.length);
+    const city = cities[Math.floor(Math.random() * cities.length)];
+    api.setEntry(type, idx, {
+      time: randomTime(),
+      destination: city,
+      platform: platforms[Math.floor(Math.random() * platforms.length)],
+      delay: delays[Math.floor(Math.random() * delays.length)],
+    });
+  }, 3000);
+
+  /* ═══════════════════════════════════════════
+   *  UTILITIES
+   * ═══════════════════════════════════════════ */
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+})();
+</script>
+</body>
+</html>

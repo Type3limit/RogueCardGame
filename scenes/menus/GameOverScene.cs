@@ -14,6 +14,8 @@ public partial class GameOverScene : Control
 
     public override void _Ready()
     {
+        GameManager.Instance.SetCurrentRunScene("gameover");
+
         _title = GetNode<Label>("Title");
         _statsLabel = GetNode<Label>("StatsLabel");
         _retryBtn = GetNode<Button>("RetryBtn");

@@ -27,7 +27,7 @@
         "entryEffect": "⚠️ 数据霸主启动分裂协议——召唤数据分身！",
         "intentPatterns": [
           { "type": "attack",  "value": 18, "scope": "singleAny",  "weight": 2.0, "description": "强化数据射线 18" },
-          { "type": "summon",  "value": 1,  "scope": "self",       "weight": 1.5, "description": "数据分身" },
+          { "type": "summon",  "value": 1,  "scope": "self",       "weight": 1.5, "summonId": "data_clone", "description": "数据分身" },
           { "type": "attack",  "value": 12, "scope": "all",        "weight": 1.5, "description": "数据风暴 12 (全体)" },
           { "type": "debuff",  "value": 2,  "scope": "singleAny",  "weight": 1.0, "description": "漏洞扫描 (易伤2)" }
         ]

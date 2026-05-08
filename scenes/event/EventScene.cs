@@ -2,7 +2,11 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RogueCardGame.Core.Cards;
 using RogueCardGame.Core.Events;
+using RogueCardGame.Core.Implants;
+using RogueCardGame.Core.Potions;
+using RogueCardGame.Core.Run;
 
 namespace RogueCardGame;
 
@@ -24,9 +28,12 @@ public partial class EventScene : Control
     private const float TypeSpeed = 0.025f;
     private bool _typing;
     private TopBarHUD? _topBar;
+    private bool _choiceResolved;
 
     public override void _Ready()
     {
+        GameManager.Instance.SetCurrentRunScene("event");
+
         _title = GetNode<Label>("EventPanel/Content/Title");
         _description = GetNode<RichTextLabel>("EventPanel/Content/Description");
         _choicesContainer = GetNode<VBoxContainer>("EventPanel/Content/ChoicesContainer");
@@ -131,7 +138,8 @@ public partial class EventScene : Control
         var run = GameManager.Instance.CurrentRun;
         if (run == null) return;
 
-        _eventSystem = new EventSystem(run.Random);
+        _choiceResolved = false;
+        _eventSystem = new EventSystem(run.Random, run.SeenOneTimeEvents);
         var allEvents = run.EventDb.GetAll();
         _currentEvent = _eventSystem.SelectEvent(allEvents, run.CurrentAct);
 
@@ -159,15 +167,18 @@ public partial class EventScene : Control
 
     private void BuildChoices()
     {
+        var run = GameManager.Instance.CurrentRun;
         foreach (var child in _choicesContainer.GetChildren())
             child.QueueFree();
 
-        if (_currentEvent == null) return;
+        if (_currentEvent == null || run == null) return;
 
         for (int i = 0; i < _currentEvent.Choices.Count; i++)
         {
             var choice = _currentEvent.Choices[i];
             int choiceIndex = i;
+            bool available = IsChoiceAvailable(choice, run);
+            string requirementText = GetChoiceRequirementText(choice.Condition);
 
             var panel = new PanelContainer();
             panel.CustomMinimumSize = new Vector2(0, 54);
@@ -181,8 +192,8 @@ public partial class EventScene : Control
 
             var style = new StyleBoxFlat
             {
-                BgColor = choiceColor * 0.12f,
-                BorderColor = choiceColor * 0.5f,
+                BgColor = available ? choiceColor * 0.12f : new Color(0.08f, 0.08f, 0.1f, 0.85f),
+                BorderColor = available ? choiceColor * 0.5f : new Color(0.25f, 0.25f, 0.3f),
                 BorderWidthBottom = 1, BorderWidthTop = 1,
                 BorderWidthLeft = 3, BorderWidthRight = 1,
                 CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
@@ -209,51 +220,62 @@ public partial class EventScene : Control
 
             var textLabel = new Label { Text = choice.Text };
             textLabel.AddThemeFontSizeOverride("font_size", 19);
-            textLabel.AddThemeColorOverride("font_color", new Color(0.85f, 0.85f, 0.9f));
+            textLabel.AddThemeColorOverride("font_color", available ? new Color(0.85f, 0.85f, 0.9f) : new Color(0.45f, 0.45f, 0.5f));
             textLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             textVbox.AddChild(textLabel);
 
             // STS2-style: preview outcomes
-            var preview = GetOutcomePreview(choice);
+            var preview = !available && !string.IsNullOrEmpty(requirementText)
+                ? requirementText
+                : GetOutcomePreview(choice);
             if (!string.IsNullOrEmpty(preview))
             {
                 var previewLbl = new Label { Text = preview };
                 previewLbl.AddThemeFontSizeOverride("font_size", 13);
-                previewLbl.AddThemeColorOverride("font_color", new Color(0.55f, 0.55f, 0.65f));
+                previewLbl.AddThemeColorOverride("font_color",
+                    available ? new Color(0.55f, 0.55f, 0.65f) : new Color(0.7f, 0.45f, 0.35f));
                 previewLbl.AutowrapMode = TextServer.AutowrapMode.WordSmart;
                 textVbox.AddChild(previewLbl);
             }
 
             hbox.AddChild(textVbox);
 
-            var arrow = new Label { Text = "→" };
+            var arrow = new Label { Text = available ? "→" : "锁" };
             arrow.AddThemeFontSizeOverride("font_size", 20);
-            arrow.AddThemeColorOverride("font_color", choiceColor * 0.7f);
+            arrow.AddThemeColorOverride("font_color", available ? choiceColor * 0.7f : new Color(0.45f, 0.45f, 0.5f));
             hbox.AddChild(arrow);
 
             panel.AddChild(hbox);
 
             // Hover
-            panel.MouseEntered += () =>
+            if (available)
             {
-                AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonHover);
-                var tw = CreateTween();
-                tw.TweenProperty(panel, "modulate", new Color(1.15f, 1.15f, 1.15f), 0.12f);
-                style.BorderColor = choiceColor;
-                style.ShadowSize = 8;
-            };
-            panel.MouseExited += () =>
+                panel.MouseEntered += () =>
+                {
+                    AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonHover);
+                    var tw = CreateTween();
+                    tw.TweenProperty(panel, "modulate", new Color(1.15f, 1.15f, 1.15f), 0.12f);
+                    style.BorderColor = choiceColor;
+                    style.ShadowSize = 8;
+                };
+                panel.MouseExited += () =>
+                {
+                    var tw = CreateTween();
+                    tw.TweenProperty(panel, "modulate", Colors.White, 0.12f);
+                    style.BorderColor = choiceColor * 0.5f;
+                    style.ShadowSize = 4;
+                };
+                panel.GuiInput += (ev) =>
+                {
+                    if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                        OnChoiceMade(choiceIndex);
+                };
+                panel.MouseDefaultCursorShape = CursorShape.PointingHand;
+            }
+            else
             {
-                var tw = CreateTween();
-                tw.TweenProperty(panel, "modulate", Colors.White, 0.12f);
-                style.BorderColor = choiceColor * 0.5f;
-                style.ShadowSize = 4;
-            };
-            panel.GuiInput += (ev) =>
-            {
-                if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-                    OnChoiceMade(choiceIndex);
-            };
+                panel.MouseDefaultCursorShape = CursorShape.Forbidden;
+            }
 
             // Stagger reveal
             panel.Modulate = new Color(1, 1, 1, 0);
@@ -268,7 +290,9 @@ public partial class EventScene : Control
 
     private void OnChoiceMade(int choiceIndex)
     {
-        if (_currentEvent == null || _eventSystem == null) return;
+        if (_choiceResolved || _currentEvent == null || _eventSystem == null) return;
+
+        _choiceResolved = true;
 
         AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
 
@@ -304,53 +328,216 @@ public partial class EventScene : Control
         var run = GameManager.Instance.CurrentRun;
         if (run == null) return;
 
-        var resultText = "";
+        var resultLines = new List<string>();
 
         foreach (var outcome in outcomes)
         {
             switch (outcome.Effect)
             {
                 case EventChoiceEffect.GainGold:
-                    run.AddGold(outcome.Value);
+                    run.AddGold((int)outcome.Value);
                     AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.GoldGain);
-                    resultText += $"[color=yellow]💰 获得 {outcome.Value} 金币[/color]\n";
+                    resultLines.Add($"[color=yellow]💰 获得 {(int)outcome.Value} 金币[/color]");
                     break;
                 case EventChoiceEffect.LoseGold:
-                    run.TrySpendGold(outcome.Value);
-                    resultText += $"[color=red]💰 失去 {outcome.Value} 金币[/color]\n";
+                    run.TrySpendGold((int)outcome.Value);
+                    resultLines.Add($"[color=red]💰 失去 {(int)outcome.Value} 金币[/color]");
                     break;
                 case EventChoiceEffect.GainHp:
-                    run.Player.Heal(outcome.Value);
+                    run.Player.Heal((int)outcome.Value);
                     AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.Heal);
-                    resultText += $"[color=green]❤ 恢复 {outcome.Value} 生命值[/color]\n";
+                    resultLines.Add($"[color=green]❤ 恢复 {(int)outcome.Value} 生命值[/color]");
                     break;
                 case EventChoiceEffect.LoseHp:
-                    run.Player.TakeDamage(outcome.Value);
-                    resultText += $"[color=red]❤ 失去 {outcome.Value} 生命值[/color]\n";
+                    run.Player.TakeDamage((int)outcome.Value);
+                    resultLines.Add($"[color=red]❤ 失去 {(int)outcome.Value} 生命值[/color]");
                     break;
                 case EventChoiceEffect.GainMaxHp:
-                    run.Player.MaxHp += outcome.Value;
-                    run.Player.Heal(outcome.Value);
-                    resultText += $"[color=green]⬆ 最大生命值 +{outcome.Value}[/color]\n";
+                    run.Player.MaxHp += (int)outcome.Value;
+                    run.Player.Heal((int)outcome.Value);
+                    resultLines.Add($"[color=green]⬆ 最大生命值 +{(int)outcome.Value}[/color]");
                     break;
                 case EventChoiceEffect.LoseMaxHp:
-                    run.Player.MaxHp = Math.Max(1, run.Player.MaxHp - outcome.Value);
+                    run.Player.MaxHp = Math.Max(1, run.Player.MaxHp - (int)outcome.Value);
                     if (run.Player.CurrentHp > run.Player.MaxHp)
                         run.Player.CurrentHp = run.Player.MaxHp;
-                    resultText += $"[color=red]⬇ 最大生命值 -{outcome.Value}[/color]\n";
+                    resultLines.Add($"[color=red]⬇ 最大生命值 -{(int)outcome.Value}[/color]");
+                    break;
+                case EventChoiceEffect.GainPotion:
+                    resultLines.Add(ResolveGainPotion(run, outcome));
+                    break;
+                case EventChoiceEffect.LosePotion:
+                    resultLines.Add(ResolveLosePotion(run));
+                    break;
+                case EventChoiceEffect.UpgradeCard:
+                    resultLines.Add(ResolveUpgradeCard(run));
+                    break;
+                case EventChoiceEffect.RemoveCard:
+                    resultLines.Add(ResolveRemoveCard(run));
+                    break;
+                case EventChoiceEffect.GainImplant:
+                    resultLines.Add(ResolveGainImplant(run, outcome));
+                    break;
+                case EventChoiceEffect.GainCard:
+                    resultLines.Add(ResolveGainCard(run, outcome));
                     break;
                 case EventChoiceEffect.Nothing:
-                    resultText += outcome.FlavorText ?? "什么都没有发生。\n";
+                    resultLines.Add(outcome.FlavorText ?? "什么都没有发生。");
                     break;
                 default:
-                    resultText += outcome.FlavorText ?? $"{outcome.Effect}\n";
+                    resultLines.Add(outcome.FlavorText ?? $"{outcome.Effect}");
                     break;
             }
         }
 
-        _resultLabel.Text = resultText;
+        _resultLabel.Text = string.Join("\n", resultLines.Where(line => !string.IsNullOrWhiteSpace(line)));
 
         _topBar?.Refresh();
+    }
+
+    private static bool IsChoiceAvailable(EventChoice choice, RunState run)
+    {
+        if (string.IsNullOrWhiteSpace(choice.Condition))
+            return true;
+
+        var conditions = choice.Condition.Split("&&", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return conditions.All(condition => EvaluateCondition(condition, run));
+    }
+
+    private static bool EvaluateCondition(string condition, RunState run)
+    {
+        if (condition.StartsWith("gold>=", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(condition[6..], out int goldRequired))
+            return run.Gold >= goldRequired;
+
+        return condition.ToLowerInvariant() switch
+        {
+            "haspotion" => run.Potions.Slots.Any(p => p != null),
+            "hasremovablecard" => run.MasterDeck.Count > 0,
+            "hasupgradablecard" => run.MasterDeck.Any(card => !card.IsUpgraded),
+            _ => true
+        };
+    }
+
+    private static string GetChoiceRequirementText(string? condition)
+    {
+        if (string.IsNullOrWhiteSpace(condition))
+            return string.Empty;
+
+        var conditions = condition.Split("&&", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var descriptions = conditions.Select(static part =>
+        {
+            if (part.StartsWith("gold>=", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(part[6..], out int goldRequired))
+                return $"需要至少 {goldRequired} 金币";
+
+            return part.ToLowerInvariant() switch
+            {
+                "haspotion" => "需要至少 1 瓶药水",
+                "hasremovablecard" => "需要牌组里至少有 1 张可移除卡牌",
+                "hasupgradablecard" => "需要至少 1 张可升级卡牌",
+                _ => part
+            };
+        });
+
+        return $"条件不足：{string.Join("，", descriptions)}";
+    }
+
+    private string ResolveGainPotion(RunState run, EventChoiceOutcome outcome)
+    {
+        if (!run.Potions.HasEmptySlot())
+            return "[color=red]🧪 药水槽已满，未能获得新药水[/color]";
+
+        PotionData? potion = !string.IsNullOrWhiteSpace(outcome.TargetId)
+            ? run.PotionDb.GetPotion(outcome.TargetId)
+            : PickRandom(run.PotionDb.GetAll(), run.Random);
+
+        if (potion == null || !run.Potions.TryAddPotion(potion))
+            return "[color=red]🧪 未找到可获得的药水[/color]";
+
+        AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
+        return $"[color=green]🧪 获得 {potion.Name}[/color]";
+    }
+
+    private static string ResolveLosePotion(RunState run)
+    {
+        int slot = Array.FindIndex(run.Potions.Slots.ToArray(), potion => potion != null);
+        if (slot < 0)
+            return "[color=red]🧪 没有可失去的药水[/color]";
+
+        var potion = run.Potions.Slots[slot];
+        run.Potions.DiscardPotion(slot);
+        return $"[color=red]🧪 失去 {potion?.Name ?? "药水"}[/color]";
+    }
+
+    private static string ResolveUpgradeCard(RunState run)
+    {
+        var upgradable = run.MasterDeck.Where(card => !card.IsUpgraded).ToList();
+        if (upgradable.Count == 0)
+            return "[color=red]⬆ 没有可升级的卡牌[/color]";
+
+        var card = upgradable[run.Random.Next(upgradable.Count)];
+        string before = card.DisplayName;
+        card.Upgrade();
+        return $"[color=green]⬆ {before} 升级为 {card.DisplayName}[/color]";
+    }
+
+    private static string ResolveRemoveCard(RunState run)
+    {
+        var removable = run.MasterDeck
+            .OrderBy(card => card.Data.Rarity == CardRarity.Starter ? 0 : 1)
+            .ThenBy(card => card.CurrentCost)
+            .ThenBy(card => card.DisplayName)
+            .ToList();
+
+        if (removable.Count == 0)
+            return "[color=red]✂ 没有可移除的卡牌[/color]";
+
+        var card = removable[0];
+        run.RemoveCardFromDeck(card);
+        return $"[color=green]✂ 移除了 {card.DisplayName}[/color]";
+    }
+
+    private string ResolveGainImplant(RunState run, EventChoiceOutcome outcome)
+    {
+        ImplantData? implant = !string.IsNullOrWhiteSpace(outcome.TargetId)
+            ? run.ImplantDb.GetImplant(outcome.TargetId)
+            : PickRandom(
+                run.ImplantDb.GetForClass(run.Player.Class)
+                    .Where(data => run.Implants.GetAllEquipped().All(equipped => equipped.Data.Id != data.Id))
+                    .ToList(),
+                run.Random);
+
+        implant ??= PickRandom(run.ImplantDb.GetForClass(run.Player.Class), run.Random);
+        if (implant == null)
+            return "[color=red]⚙ 未找到可用植入体[/color]";
+
+        var replaced = run.Implants.Equip(implant);
+        string replacedText = replaced != null ? $"（替换 {replaced.Data.Name}）" : string.Empty;
+        return $"[color=green]⚙ 获得并装配 {implant.Name}{replacedText}[/color]";
+    }
+
+    private static string ResolveGainCard(RunState run, EventChoiceOutcome outcome)
+    {
+        CardData? card = !string.IsNullOrWhiteSpace(outcome.TargetId)
+            ? run.CardDb.GetCard(outcome.TargetId)
+            : PickRandom(
+                run.CardDb.GetCardsByClass(run.Player.Class)
+                    .Where(data => data.Rarity != CardRarity.Starter)
+                    .ToList(),
+                run.Random);
+
+        if (card == null)
+            return "[color=red]🃏 未找到可获得的卡牌[/color]";
+
+        run.AddCardToDeck(card);
+        return $"[color=green]🃏 获得 {card.Name}[/color]";
+    }
+
+    private static T? PickRandom<T>(List<T> list, Core.Deck.SeededRandom random) where T : class
+    {
+        if (list.Count == 0) return null;
+        return list[random.Next(list.Count)];
     }
 
     private static string GetOutcomePreview(EventChoice choice)
@@ -366,6 +553,12 @@ public partial class EventScene : Control
                 EventChoiceEffect.LoseHp => $"❤-{o.Value}",
                 EventChoiceEffect.GainMaxHp => $"⬆MaxHP+{o.Value}",
                 EventChoiceEffect.LoseMaxHp => $"⬇MaxHP-{o.Value}",
+                EventChoiceEffect.GainPotion => "🧪药水",
+                EventChoiceEffect.LosePotion => "🧪-1",
+                EventChoiceEffect.UpgradeCard => "⬆升级",
+                EventChoiceEffect.RemoveCard => "✂删牌",
+                EventChoiceEffect.GainImplant => "⚙植入体",
+                EventChoiceEffect.GainCard => "🃏卡牌",
                 EventChoiceEffect.Nothing => null,
                 _ => null
             };
@@ -377,6 +570,7 @@ public partial class EventScene : Control
     private void OnContinuePressed()
     {
         AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+        GameManager.Instance.SetCurrentRunScene("map");
         SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
     }
 

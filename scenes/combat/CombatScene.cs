@@ -45,6 +45,32 @@ public partial class CombatScene : Control
 	private Label _discardPileCountLabel = null!;
 	private Label _exhaustPileCountLabel = null!;
 
+	// --- Pile viewer overlay ---
+	private enum PileViewMode { DrawPile, DiscardPile, ExhaustPile, FullDeck }
+	private PileViewMode _currentPileViewMode;
+	private Control? _pileViewerBackdrop;
+	private Label? _pileViewerTitle;
+	private Label? _pileViewerCountNote;
+	private HFlowContainer? _pileViewerCardList;
+	private Button[]? _pileViewerTabBtns;
+
+	// --- Readability / feedback UI ---
+	private PanelContainer _cardPreviewPanel = null!;
+	private StyleBoxFlat _cardPreviewStyle = null!;
+	private Label _cardPreviewTitle = null!;
+	private Label _cardPreviewMeta = null!;
+	private Label _cardPreviewState = null!;
+	private Label _cardPreviewDesc = null!;
+	private PanelContainer _formationHintPanel = null!;
+	private Label _formationHintLabel = null!;
+	private Label _formationStateLabel = null!;
+	private PanelContainer _selectionHintPanel = null!;
+	private Label _selectionHintLabel = null!;
+	private PanelContainer _toastPanel = null!;
+	private Label _toastLabel = null!;
+	private Tween? _toastTween;
+	private PanelContainer? _renderLayerDebugPanel;
+
 	// --- Combat state ---
 	private CombatManager? _combat;
 	private PlayerCharacter? _player;
@@ -61,17 +87,30 @@ public partial class CombatScene : Control
 	private bool _inputLocked;
 	private bool? _combatResult;
 	private int _hoveredCardIndex = -1;
-	private Control? _hoveredCardControl;
+	private Control? _hoveredCardHitbox;
+	private Control? _hoveredCardVisual;
+	private StyleBoxFlat? _hoveredCardStyle;
+	private Color _hoveredCardBaseBorderColor = Colors.Transparent;
+	private Color _hoveredCardBaseShadowColor = Colors.Transparent;
 	private float _idleTime;
 
 	// --- Card fan constants ---
 	private const float CardWidth = 120f;
 	private const float CardHeight = 168f;
-	private const float FanAngle = 2.5f;
-	private const float FanLift = 40f;
-	private const float HoverLift = 80f;
-	private const float HoverScale = 1.2f;
-	private const float CardOverlap = 0.72f;
+	private const float BaseFanAngle = 2.2f;
+	private const float DenseHandFanAngle = 1.4f;
+	private const float BaseFanLift = 28f;
+	private const float DenseHandFanLift = 18f;
+	private const float HoverLift = 56f;
+	private const float HoverScale = 1.12f;
+	private const float HoverSidePadding = CardWidth * (HoverScale - 1f) * 0.5f;
+	private const float HoverTopPadding = CardHeight * (HoverScale - 1f);
+	private const float CardHitboxWidth = CardWidth + HoverSidePadding * 2f;
+	private const float CardHitboxHeight = CardHeight + HoverLift + HoverTopPadding;
+	private const float MinDenseHandSpacingRatio = 0.72f;
+	private static readonly bool DebugRenderLayers = false;
+	private static readonly bool DebugHandRenderDump = false;
+	private int _handRenderDumpSequence;
 
 	// --- Texture cache ---
 	private static readonly Dictionary<string, Texture2D> _textureCache = new();
@@ -110,6 +149,8 @@ public partial class CombatScene : Control
 
 	public override void _Ready()
 	{
+		GameManager.Instance.SetCurrentRunScene("combat");
+
 		_enemyArea = GetNode<HBoxContainer>("EnemyArea");
 		_handArea = GetNode<Control>("HandArea");
 		_endTurnBtn = GetNode<Button>("EndTurnBtn");
@@ -133,16 +174,218 @@ public partial class CombatScene : Control
 		_blockLabel.Visible = false;
 		_classResourceLabel.Visible = false;
 
-		CyberFx.AddScanlines(this, 0.03f);
-		CyberFx.AddVignette(this);
+		var backgroundImage = GetNode<Control>("BackgroundImage");
+		var scanlines = CyberFx.AddScanlines(this, 0.03f);
+		var vignette = CyberFx.AddVignette(this);
+		if (DebugRenderLayers)
+		{
+			scanlines.Name = "DebugScanlines";
+			vignette.Name = "DebugVignette";
+		}
+		MoveChild(scanlines, backgroundImage.GetIndex() + 1);
+		MoveChild(vignette, scanlines.GetIndex() + 1);
+		if (DebugRenderLayers)
+		{
+			AddSceneLayerBadge(scanlines, $"scan #{scanlines.GetIndex():00}", new Color(0.18f, 0.9f, 0.98f), 12f);
+			AddSceneLayerBadge(vignette, $"vig #{vignette.GetIndex():00}", new Color(1f, 0.56f, 0.32f), 40f);
+		}
 
 		_topBar = TopBarHUD.Attach(this);
 
 		BuildPlayerCharacter();
 		BuildEnergyOrb();
 		BuildPileDisplays();
+		BuildCombatHelpUi();
 		StyleUI();
 		StartCombat();
+		if (DebugRenderLayers)
+			CallDeferred(nameof(RefreshRenderLayerDebugOverlay));
+	}
+
+	public override void _Input(InputEvent ev)
+	{
+		// Close pile viewer with Escape (takes priority over card selection cancel)
+		if (_pileViewerBackdrop?.Visible == true && ev.IsActionPressed("ui_cancel"))
+		{
+			HidePileViewer();
+			GetViewport().SetInputAsHandled();
+			return;
+		}
+
+		if (_inputLocked || _selectedCard == null)
+			return;
+
+		if (ev.IsActionPressed("ui_cancel") || ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
+		{
+			CancelCardSelection("已取消选牌");
+			GetViewport().SetInputAsHandled();
+		}
+	}
+
+	private void RefreshRenderLayerDebugOverlay()
+	{
+		if (!DebugRenderLayers)
+			return;
+
+		var entries = new List<(string label, Color color)>();
+		foreach (Node child in GetChildren())
+		{
+			if (child.Name.ToString() == "RenderLayerDebugPanel" || child is not CanvasItem canvasItem)
+				continue;
+
+			string childName = child.Name.ToString();
+			entries.Add(($"{canvasItem.GetIndex():00} {childName}", GetRenderLayerDebugColor(childName)));
+		}
+
+		_renderLayerDebugPanel?.QueueFree();
+		_renderLayerDebugPanel = CreateRenderLayerDebugPanel(entries);
+		AddChild(_renderLayerDebugPanel);
+	}
+
+	private static PanelContainer CreateRenderLayerDebugPanel(IReadOnlyList<(string label, Color color)> entries)
+	{
+		var panel = new PanelContainer
+		{
+			Name = "RenderLayerDebugPanel",
+			MouseFilter = MouseFilterEnum.Ignore,
+			ZIndex = 4096
+		};
+		panel.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+		panel.OffsetLeft = 12f;
+		panel.OffsetTop = 12f;
+		panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.02f, 0.026f, 0.038f, 0.94f),
+			BorderColor = new Color(0.78f, 0.84f, 0.96f, 0.26f),
+			BorderWidthBottom = 1,
+			BorderWidthLeft = 1,
+			BorderWidthRight = 1,
+			BorderWidthTop = 1,
+			CornerRadiusBottomLeft = 6,
+			CornerRadiusBottomRight = 6,
+			CornerRadiusTopLeft = 6,
+			CornerRadiusTopRight = 6,
+			ContentMarginBottom = 6,
+			ContentMarginLeft = 8,
+			ContentMarginRight = 8,
+			ContentMarginTop = 6
+		});
+
+		var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		box.AddThemeConstantOverride("separation", 2);
+
+		var title = new Label
+		{
+			Text = "COMBAT ROOT ORDER",
+			MouseFilter = MouseFilterEnum.Ignore
+		};
+		title.AddThemeFontSizeOverride("font_size", 9);
+		title.AddThemeColorOverride("font_color", new Color(0.92f, 0.96f, 1f));
+		box.AddChild(title);
+
+		foreach (var (label, color) in entries)
+		{
+			var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+			row.AddThemeConstantOverride("separation", 5);
+
+			var swatch = new ColorRect
+			{
+				Color = color,
+				CustomMinimumSize = new Vector2(7f, 7f),
+				MouseFilter = MouseFilterEnum.Ignore
+			};
+			row.AddChild(swatch);
+
+			var itemLabel = new Label
+			{
+				Text = label,
+				MouseFilter = MouseFilterEnum.Ignore
+			};
+			itemLabel.AddThemeFontSizeOverride("font_size", 8);
+			itemLabel.AddThemeColorOverride("font_color", new Color(0.84f, 0.88f, 0.96f));
+			row.AddChild(itemLabel);
+
+			box.AddChild(row);
+		}
+
+		panel.AddChild(box);
+		return panel;
+	}
+
+	private static Color GetRenderLayerDebugColor(string nodeName)
+	{
+		string lowerName = nodeName.ToLowerInvariant();
+		if (lowerName.Contains("background"))
+			return new Color(0.46f, 0.62f, 0.98f);
+		if (lowerName.Contains("enemy"))
+			return new Color(1f, 0.42f, 0.42f);
+		if (lowerName.Contains("hand"))
+			return new Color(0.52f, 0.96f, 0.72f);
+		if (lowerName.Contains("scan"))
+			return new Color(0.18f, 0.9f, 0.98f);
+		if (lowerName.Contains("vignette"))
+			return new Color(1f, 0.56f, 0.32f);
+		if (lowerName.Contains("damage"))
+			return new Color(1f, 0.84f, 0.28f);
+		if (lowerName.Contains("turn") || lowerName.Contains("topbar"))
+			return new Color(0.9f, 0.72f, 1f);
+		return new Color(0.76f, 0.82f, 0.94f);
+	}
+
+	private static void AddSceneLayerBadge(Control layer, string label, Color color, float topOffset)
+	{
+		if (layer.GetNodeOrNull<PanelContainer>("DebugLayerBadge") != null)
+			return;
+
+		var badge = new PanelContainer
+		{
+			Name = "DebugLayerBadge",
+			MouseFilter = MouseFilterEnum.Ignore,
+			ZIndex = 4096
+		};
+		badge.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+		badge.OffsetLeft = 12f;
+		badge.OffsetTop = topOffset;
+		badge.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.025f, 0.03f, 0.044f, 0.9f),
+			BorderColor = new Color(color.R, color.G, color.B, 0.42f),
+			BorderWidthBottom = 1,
+			BorderWidthLeft = 1,
+			BorderWidthRight = 1,
+			BorderWidthTop = 1,
+			CornerRadiusBottomLeft = 5,
+			CornerRadiusBottomRight = 5,
+			CornerRadiusTopLeft = 5,
+			CornerRadiusTopRight = 5,
+			ContentMarginBottom = 4,
+			ContentMarginLeft = 6,
+			ContentMarginRight = 6,
+			ContentMarginTop = 4
+		});
+
+		var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		row.AddThemeConstantOverride("separation", 4);
+
+		var swatch = new ColorRect
+		{
+			Color = color,
+			CustomMinimumSize = new Vector2(6f, 6f),
+			MouseFilter = MouseFilterEnum.Ignore
+		};
+		row.AddChild(swatch);
+
+		var text = new Label
+		{
+			Text = label,
+			MouseFilter = MouseFilterEnum.Ignore
+		};
+		text.AddThemeFontSizeOverride("font_size", 9);
+		text.AddThemeColorOverride("font_color", new Color(0.9f, 0.94f, 1f));
+		row.AddChild(text);
+
+		badge.AddChild(row);
+		layer.AddChild(badge);
 	}
 
 	// ======================================================================
@@ -394,6 +637,12 @@ public partial class CombatScene : Control
 		drawPile.AnchorTop = 0.86f; drawPile.AnchorBottom = 0.96f;
 		AddChild(drawPile);
 		_drawPileCountLabel = drawPile.GetChild(0).GetChild<Label>(1);
+		drawPile.MouseDefaultCursorShape = CursorShape.PointingHand;
+		drawPile.GuiInput += ev =>
+		{
+			if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+				ShowPileViewer(PileViewMode.DrawPile);
+		};
 
 		// Discard pile (bottom-right)
 		var discardPile = CreatePilePanel(
@@ -404,6 +653,12 @@ public partial class CombatScene : Control
 		discardPile.AnchorTop = 0.86f; discardPile.AnchorBottom = 0.96f;
 		AddChild(discardPile);
 		_discardPileCountLabel = discardPile.GetChild(0).GetChild<Label>(1);
+		discardPile.MouseDefaultCursorShape = CursorShape.PointingHand;
+		discardPile.GuiInput += ev =>
+		{
+			if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+				ShowPileViewer(PileViewMode.DiscardPile);
+		};
 
 		// Exhaust pile (small, above discard)
 		var exhaustPile = CreatePilePanel(
@@ -414,6 +669,12 @@ public partial class CombatScene : Control
 		exhaustPile.AnchorTop = 0.78f; exhaustPile.AnchorBottom = 0.85f;
 		AddChild(exhaustPile);
 		_exhaustPileCountLabel = exhaustPile.GetChild(0).GetChild<Label>(1);
+		exhaustPile.MouseDefaultCursorShape = CursorShape.PointingHand;
+		exhaustPile.GuiInput += ev =>
+		{
+			if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+				ShowPileViewer(PileViewMode.ExhaustPile);
+		};
 	}
 
 	private PanelContainer CreatePilePanel(string iconPath, Color accent)
@@ -456,6 +717,420 @@ public partial class CombatScene : Control
 
 		panel.AddChild(vbox);
 		return panel;
+	}
+
+	private void BuildCombatHelpUi()
+	{
+		BuildCardPreviewPanel();
+		BuildFormationHintPanel();
+		BuildSelectionHintPanel();
+		BuildToastPanel();
+		BuildPileViewerOverlay();
+		SetCardPreviewPlaceholder();
+	}
+
+	private void BuildCardPreviewPanel()
+	{
+		_cardPreviewPanel = new PanelContainer();
+		_cardPreviewPanel.SetAnchorsPreset(LayoutPreset.FullRect);
+		_cardPreviewPanel.AnchorLeft = 0.23f; _cardPreviewPanel.AnchorRight = 0.43f;
+		_cardPreviewPanel.AnchorTop = 0.12f; _cardPreviewPanel.AnchorBottom = 0.56f;
+		_cardPreviewPanel.MouseFilter = MouseFilterEnum.Ignore;
+
+		_cardPreviewStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.03f, 0.04f, 0.08f, 0.96f),
+			BorderColor = new Color(0.16f, 0.25f, 0.35f),
+			BorderWidthBottom = 2, BorderWidthTop = 2,
+			BorderWidthLeft = 2, BorderWidthRight = 2,
+			CornerRadiusBottomLeft = 10, CornerRadiusBottomRight = 10,
+			CornerRadiusTopLeft = 10, CornerRadiusTopRight = 10,
+			ContentMarginLeft = 14, ContentMarginRight = 14,
+			ContentMarginTop = 12, ContentMarginBottom = 12,
+			ShadowColor = new Color(0f, 0f, 0f, 0.28f),
+			ShadowSize = 10,
+			ShadowOffset = new Vector2(0, 4)
+		};
+		_cardPreviewPanel.AddThemeStyleboxOverride("panel", _cardPreviewStyle);
+
+		var vbox = new VBoxContainer();
+		vbox.AddThemeConstantOverride("separation", 6);
+
+		var header = new Label { Text = "战斗预览" };
+		header.AddThemeFontSizeOverride("font_size", 11);
+		header.AddThemeColorOverride("font_color", new Color(0.35f, 0.7f, 0.85f, 0.8f));
+		vbox.AddChild(header);
+
+		_cardPreviewTitle = new Label();
+		_cardPreviewTitle.AddThemeFontSizeOverride("font_size", 24);
+		_cardPreviewTitle.AddThemeColorOverride("font_color", Colors.White);
+		_cardPreviewTitle.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		vbox.AddChild(_cardPreviewTitle);
+
+		_cardPreviewMeta = new Label();
+		_cardPreviewMeta.AddThemeFontSizeOverride("font_size", 11);
+		_cardPreviewMeta.AddThemeColorOverride("font_color", new Color(0.5f, 0.62f, 0.72f));
+		_cardPreviewMeta.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		vbox.AddChild(_cardPreviewMeta);
+
+		var divider = new ColorRect
+		{
+			Color = new Color(0.18f, 0.28f, 0.38f, 0.6f),
+			CustomMinimumSize = new Vector2(0, 1)
+		};
+		vbox.AddChild(divider);
+
+		_cardPreviewState = new Label();
+		_cardPreviewState.AddThemeFontSizeOverride("font_size", 12);
+		_cardPreviewState.AddThemeColorOverride("font_color", new Color(0.7f, 0.8f, 0.85f));
+		_cardPreviewState.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		vbox.AddChild(_cardPreviewState);
+
+		_cardPreviewDesc = new Label
+		{
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			SizeFlagsVertical = SizeFlags.ExpandFill,
+			VerticalAlignment = VerticalAlignment.Top
+		};
+		_cardPreviewDesc.AddThemeFontSizeOverride("font_size", 16);
+		_cardPreviewDesc.AddThemeColorOverride("font_color", new Color(0.83f, 0.86f, 0.92f));
+		vbox.AddChild(_cardPreviewDesc);
+
+		_cardPreviewPanel.AddChild(vbox);
+		AddChild(_cardPreviewPanel);
+	}
+
+	private void BuildFormationHintPanel()
+	{
+		_formationHintPanel = new PanelContainer();
+		_formationHintPanel.SetAnchorsPreset(LayoutPreset.FullRect);
+		_formationHintPanel.AnchorLeft = 0.08f; _formationHintPanel.AnchorRight = 0.22f;
+		_formationHintPanel.AnchorTop = 0.68f; _formationHintPanel.AnchorBottom = 0.82f;
+		_formationHintPanel.MouseFilter = MouseFilterEnum.Ignore;
+		_formationHintPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.03f, 0.05f, 0.08f, 0.92f),
+			BorderColor = new Color(0.0f, 0.45f, 0.55f, 0.45f),
+			BorderWidthBottom = 1, BorderWidthTop = 1,
+			BorderWidthLeft = 2, BorderWidthRight = 1,
+			CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+			CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+			ContentMarginLeft = 10, ContentMarginRight = 10,
+			ContentMarginTop = 8, ContentMarginBottom = 8
+		});
+
+		var vbox = new VBoxContainer();
+		vbox.AddThemeConstantOverride("separation", 4);
+
+		var title = new Label { Text = "站位规则" };
+		title.AddThemeFontSizeOverride("font_size", 11);
+		title.AddThemeColorOverride("font_color", new Color(0.35f, 0.7f, 0.85f, 0.75f));
+		vbox.AddChild(title);
+
+		_formationHintLabel = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+		_formationHintLabel.AddThemeFontSizeOverride("font_size", 12);
+		_formationHintLabel.AddThemeColorOverride("font_color", new Color(0.86f, 0.9f, 0.94f));
+		vbox.AddChild(_formationHintLabel);
+
+		_formationStateLabel = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+		_formationStateLabel.AddThemeFontSizeOverride("font_size", 11);
+		_formationStateLabel.AddThemeColorOverride("font_color", new Color(0.58f, 0.68f, 0.76f));
+		vbox.AddChild(_formationStateLabel);
+
+		_formationHintPanel.AddChild(vbox);
+		AddChild(_formationHintPanel);
+	}
+
+	private void BuildSelectionHintPanel()
+	{
+		_selectionHintPanel = new PanelContainer();
+		_selectionHintPanel.SetAnchorsPreset(LayoutPreset.FullRect);
+		_selectionHintPanel.AnchorLeft = 0.38f; _selectionHintPanel.AnchorRight = 0.62f;
+		_selectionHintPanel.AnchorTop = 0.60f; _selectionHintPanel.AnchorBottom = 0.65f;
+		_selectionHintPanel.Visible = false;
+		_selectionHintPanel.MouseFilter = MouseFilterEnum.Ignore;
+		_selectionHintPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.06f, 0.11f, 0.16f, 0.94f),
+			BorderColor = new Color(0f, 0.78f, 0.82f, 0.55f),
+			BorderWidthBottom = 1, BorderWidthTop = 1,
+			BorderWidthLeft = 2, BorderWidthRight = 2,
+			CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+			CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+			ContentMarginLeft = 12, ContentMarginRight = 12,
+			ContentMarginTop = 8, ContentMarginBottom = 8
+		});
+
+		_selectionHintLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart
+		};
+		_selectionHintLabel.AddThemeFontSizeOverride("font_size", 13);
+		_selectionHintLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.96f, 0.98f));
+		_selectionHintPanel.AddChild(_selectionHintLabel);
+		AddChild(_selectionHintPanel);
+	}
+
+	private void BuildToastPanel()
+	{
+		_toastPanel = new PanelContainer();
+		_toastPanel.SetAnchorsPreset(LayoutPreset.FullRect);
+		_toastPanel.AnchorLeft = 0.31f; _toastPanel.AnchorRight = 0.69f;
+		_toastPanel.AnchorTop = 0.665f; _toastPanel.AnchorBottom = 0.715f;
+		_toastPanel.Visible = false;
+		_toastPanel.MouseFilter = MouseFilterEnum.Ignore;
+		_toastPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.06f, 0.08f, 0.11f, 0.95f),
+			BorderColor = new Color(0.28f, 0.4f, 0.5f, 0.7f),
+			BorderWidthBottom = 1, BorderWidthTop = 1,
+			BorderWidthLeft = 2, BorderWidthRight = 2,
+			CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+			CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+			ContentMarginLeft = 12, ContentMarginRight = 12,
+			ContentMarginTop = 6, ContentMarginBottom = 6,
+			ShadowColor = new Color(0f, 0f, 0f, 0.2f),
+			ShadowSize = 8,
+			ShadowOffset = new Vector2(0, 3)
+		});
+
+		_toastLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart
+		};
+		_toastLabel.AddThemeFontSizeOverride("font_size", 13);
+		_toastLabel.AddThemeColorOverride("font_color", new Color(0.84f, 0.9f, 0.95f));
+		_toastPanel.AddChild(_toastLabel);
+		AddChild(_toastPanel);
+	}
+
+	private void SetCardPreviewPlaceholder()
+	{
+		_cardPreviewTitle.Text = "悬停卡牌查看详情";
+		_cardPreviewMeta.Text = "费用 / 类型 / 射程 / 目标";
+		_cardPreviewState.Text = "选中需要目标的牌后，这里会锁定显示；右键或 Esc 可以取消选牌。";
+		_cardPreviewDesc.Text = "优先关注：是否受站位限制、当前能不能打、敌方下一步会打谁。";
+		SetCardPreviewAccent(new Color(0.16f, 0.25f, 0.35f), false);
+	}
+
+	private void RefreshCardPreview()
+	{
+		if (_selectedCard != null)
+		{
+			bool canPlay = _combat != null && _player != null && _combat.CanPlay(_player, _selectedCard);
+			UpdateCardPreview(_selectedCard, canPlay, true);
+			return;
+		}
+
+		SetCardPreviewPlaceholder();
+	}
+
+	private void UpdateCardPreview(Card card, bool canPlay, bool locked = false)
+	{
+		var accent = GetCardTypeColor(card);
+		var row = _combat != null && _player != null
+			? _combat.Formation.GetPosition(_player.Id)
+			: FormationRow.Front;
+		string rowText = row == FormationRow.Front ? "前排" : "后排";
+		string targetText = GetTargetTypeText(card.Data.EffectiveTargetType);
+		string rangeText = GetRangeText(card.Data.Range);
+		string cardTypeText = GetCardTypeText(card.Data.Type);
+		string stateText;
+
+		if (card.IsPositionReactive)
+		{
+			stateText = $"当前站位：{rowText}，本次将触发{rowText}效果";
+		}
+		else if (!canPlay)
+		{
+			stateText = $"当前不可打出：{GetCardPlayBlockReason(card)}";
+		}
+		else
+		{
+			stateText = locked
+				? $"已选中，等待目标：{targetText}"
+				: "当前可打出";
+		}
+
+		if (locked)
+			stateText += " · 右键或 Esc 取消";
+
+		_cardPreviewTitle.Text = card.DisplayName;
+		_cardPreviewMeta.Text = $"{cardTypeText} · {rangeText} · {targetText} · 费用 {card.EffectiveCost}";
+		_cardPreviewState.Text = stateText;
+		_cardPreviewDesc.Text = card.ActiveDescription;
+		SetCardPreviewAccent(accent, canPlay || locked);
+	}
+
+	private void SetCardPreviewAccent(Color accent, bool active)
+	{
+		_cardPreviewStyle.BorderColor = active ? accent * 0.85f : accent;
+		_cardPreviewStyle.ShadowColor = active
+			? new Color(accent.R, accent.G, accent.B, 0.18f)
+			: new Color(0f, 0f, 0f, 0.28f);
+		_cardPreviewStyle.ShadowSize = active ? 14 : 10;
+	}
+
+	private void UpdateFormationHint()
+	{
+		if (_player == null || _combat == null)
+			return;
+
+		var row = _combat.Formation.GetPosition(_player.Id);
+		bool moved = _combat.Formation.HasMovedThisTurn(_player.Id);
+		bool rooted = _player.Powers.HasPower(RogueCardGame.Core.Combat.Powers.CommonPowerIds.Rooted);
+
+		if (row == FormationRow.Front)
+		{
+			_formationHintLabel.Text = "前排承受单体攻击；获得护甲时额外 +3。";
+		}
+		else
+		{
+			_formationHintLabel.Text = "后排禁用近战；本回合第一张远程牌伤害 +20%。"
+				+ "\n提示：前排敌人被推到后排会失去攻击能力。";
+		}
+
+		_formationStateLabel.Text = rooted
+			? "当前状态：已被锁定，不能换位。"
+			: moved
+				? "当前状态：本回合已经换位。"
+				: $"当前状态：换位需要 1 点能量，你现在有 {_player.CurrentEnergy} 点。";
+	}
+
+	private void ShowSelectionHint(string text)
+	{
+		_selectionHintLabel.Text = text;
+		_selectionHintPanel.Visible = true;
+		_selectionHintPanel.Modulate = Colors.White;
+	}
+
+	private void HideSelectionHint()
+	{
+		_selectionHintPanel.Visible = false;
+	}
+
+	private void ShowToast(string text, Color? color = null)
+	{
+		_toastTween?.Kill();
+		_toastLabel.Text = text;
+		_toastLabel.AddThemeColorOverride("font_color", color ?? new Color(0.84f, 0.9f, 0.95f));
+		_toastPanel.Visible = true;
+		_toastPanel.Modulate = new Color(1, 1, 1, 0);
+		_toastPanel.Position = new Vector2(0, 0);
+
+		_toastTween = CreateTween();
+		_toastTween.TweenProperty(_toastPanel, "modulate:a", 1f, 0.12f);
+		_toastTween.Parallel().TweenProperty(_toastPanel, "position:y", -8f, 0.12f)
+			.From(8f)
+			.SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+		_toastTween.TweenInterval(1.1f);
+		_toastTween.TweenProperty(_toastPanel, "modulate:a", 0f, 0.2f);
+		_toastTween.TweenCallback(Callable.From(() =>
+		{
+			_toastPanel.Visible = false;
+			_toastPanel.Position = Vector2.Zero;
+		}));
+	}
+
+	private void CancelCardSelection(string message)
+	{
+		_selectedCard = null;
+		HideSelectionHint();
+		RefreshHand();
+		HighlightValidTargets();
+		RefreshCardPreview();
+		ShowToast(message, new Color(0.75f, 0.8f, 0.86f));
+	}
+
+	private string GetCardPlayBlockReason(Card card)
+	{
+		if (_player == null || _combat == null)
+			return "当前无法打出";
+
+		if (_player.CurrentEnergy < card.EffectiveCost)
+			return $"需要 {card.EffectiveCost} 点能量，你只有 {_player.CurrentEnergy} 点";
+
+		if (_combat.Formation.GetPosition(_player.Id) == FormationRow.Back && card.Data.Range == CardRange.Melee)
+			return "后排不能使用近战牌";
+
+		return "当前阶段不可打出";
+	}
+
+	private static string GetCardTypeText(CardType type) => type switch
+	{
+		CardType.Attack => "攻击牌",
+		CardType.Skill => "技能牌",
+		CardType.Power => "能力牌",
+		_ => type.ToString()
+	};
+
+	private static string GetRangeText(CardRange range) => range switch
+	{
+		CardRange.Melee => "近战",
+		CardRange.Ranged => "远程",
+		CardRange.None => "通用",
+		_ => range.ToString()
+	};
+
+	private static string GetTargetTypeText(TargetType targetType) => targetType switch
+	{
+		TargetType.SingleEnemy => "单体敌人",
+		TargetType.AllEnemies => "全体敌人",
+		TargetType.FrontRowEnemies => "前排敌人",
+		TargetType.BackRowEnemies => "后排敌人",
+		TargetType.Self => "自身",
+		TargetType.SingleAlly => "单体友军",
+		TargetType.AllAllies => "全体友军",
+		TargetType.All => "全场",
+		TargetType.None => "无目标",
+		_ => targetType.ToString()
+	};
+
+	private static string GetIntentScopeText(TargetScope scope) => scope switch
+	{
+		TargetScope.SingleFront => "前排仇恨最高",
+		TargetScope.SingleBack => "直接打后排",
+		TargetScope.SingleAny => "仇恨最高目标",
+		TargetScope.AllFront => "命中前排全体",
+		TargetScope.AllBack => "命中后排全体",
+		TargetScope.All => "命中我方全体",
+		TargetScope.Self => "作用于自身",
+		TargetScope.AllEnemies => "作用于敌方全体",
+		_ => scope.ToString()
+	};
+
+	private static string GetIntentKeywordText(List<string> keywords)
+	{
+		if (keywords.Count == 0)
+			return string.Empty;
+
+		var labels = keywords.Select(keyword => keyword.ToLowerInvariant() switch
+		{
+			"lock" => "附加锁定",
+			"breakcover" => "溅射后排",
+			_ => keyword
+		});
+
+		return string.Join("、", labels);
+	}
+
+	private static string BuildIntentDetailText(EnemyIntent intent)
+	{
+		var parts = new List<string>();
+		if (!string.IsNullOrWhiteSpace(intent.Description))
+			parts.Add(intent.Description!);
+
+		parts.Add(GetIntentScopeText(intent.Scope));
+
+		var keywordText = GetIntentKeywordText(intent.Keywords);
+		if (!string.IsNullOrEmpty(keywordText))
+			parts.Add(keywordText);
+
+		return string.Join(" · ", parts);
 	}
 
 	// ======================================================================
@@ -628,7 +1303,7 @@ public partial class CombatScene : Control
 		if (run == null) { GD.PrintErr("[CombatScene] No active run!"); return; }
 
 		_player = run.Player;
-		var enemies = CreateEnemiesForNode(run);
+		var enemies = run.CreateEnemiesForCurrentNode();
 		_combat = run.CreateCombat(enemies);
 		if (_combat == null)
 		{
@@ -640,6 +1315,8 @@ public partial class CombatScene : Control
 		_combat.OnCardPlayed += (_, card) => GD.Print($"[Combat] Played: {card.DisplayName}");
 		_combat.OnCombatEnded += OnCombatEnded;
 		_combat.OnEnemyAction += (e, i) => GD.Print($"[Combat] {e.Name}: {i.Type} {i.Value}");
+		_combat.OnEnemySummoned += AddEnemyPanel;
+		_combat.EnemyFactory = run.CreateEnemyById;
 
 		if (_combat.PlayerDecks.TryGetValue(_player.Id, out var deck))
 			_deck = deck;
@@ -659,69 +1336,6 @@ public partial class CombatScene : Control
 		RefreshAll();
 		ShowTurnBanner("\u2694 \u6218 \u6597 \u5f00 \u59cb \u2694", new Color(0.9f, 0.7f, 0.1f));
 	}
-
-	private List<Enemy> CreateEnemiesForNode(Core.Run.RunState run)
-	{
-		var node = run.CurrentMap?.CurrentNode;
-		if (node == null) return [new Enemy(CreateFallbackEnemyData())];
-		bool isElite = node.Type == RoomType.EliteCombat;
-		bool isBoss = node.Type == RoomType.Boss;
-		int act = run.CurrentAct;
-		var enemies = new List<Enemy>();
-		if (isBoss) enemies.Add(new Enemy(CreateBossData(act)));
-		else if (isElite) enemies.Add(new Enemy(CreateEliteData(act)));
-		else { int c = run.Random.Next(1, 4); for (int i = 0; i < c; i++) enemies.Add(new Enemy(CreateNormalEnemyData(act, run.Random))); }
-		return enemies;
-	}
-
-	private static EnemyData CreateFallbackEnemyData() => new()
-	{
-		Id = "fallback", Name = "\u6d4b\u8bd5\u654c\u4eba", MaxHp = 30, PreferredRow = FormationRow.Front,
-		IntentPatterns = [new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 8 }, new EnemyIntentPattern { Type = EnemyIntentType.Defend, Value = 5 }]
-	};
-
-	private static EnemyData CreateNormalEnemyData(int act, SeededRandom rng)
-	{
-		int hp = 20 + act * 10 + rng.Next(0, 10); int dmg = 5 + act * 3;
-		string[] names = ["\u8d5b\u535a\u66b4\u5f92", "\u6d41\u6d6a\u673a\u5668\u4eba", "\u75c5\u6bd2\u8820\u866b", "\u51c0\u5316\u65e0\u4eba\u673a", "\u9ed1\u5e02\u8d70\u79c1\u8005"];
-		return new()
-		{
-			Id = $"normal_{act}_{rng.Next(1000)}", Name = names[rng.Next(names.Length)],
-			MaxHp = hp, PreferredRow = rng.NextDouble() < 0.5 ? FormationRow.Front : FormationRow.Back,
-			IntentPatterns = [
-				new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = dmg, Weight = 0.5f },
-				new EnemyIntentPattern { Type = EnemyIntentType.AttackDefend, Value = dmg - 2, Weight = 0.3f },
-				new EnemyIntentPattern { Type = EnemyIntentType.Defend, Value = dmg, Weight = 0.2f }]
-		};
-	}
-
-	private static EnemyData CreateEliteData(int act) => new()
-	{
-		Id = $"elite_{act}", Name = act switch { 1 => "\u94ec\u5408\u91d1\u6267\u6cd5\u8005", 2 => "\u8d5b\u535a\u6b66\u58eb", _ => "\u6697\u7f51\u5b88\u62a4\u8005" },
-		MaxHp = 60 + act * 25, PreferredRow = FormationRow.Front, IsElite = true,
-		IntentPatterns = [
-			new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 10 + act * 5, Weight = 0.4f },
-			new EnemyIntentPattern { Type = EnemyIntentType.AttackDefend, Value = 8 + act * 3, Weight = 0.3f },
-			new EnemyIntentPattern { Type = EnemyIntentType.Buff, Value = 3, Weight = 0.15f },
-			new EnemyIntentPattern { Type = EnemyIntentType.Debuff, Value = 2, Weight = 0.15f }]
-	};
-
-	private static EnemyData CreateBossData(int act) => new()
-	{
-		Id = $"boss_{act}", Name = act switch { 1 => "\u5783\u573e\u573a\u9886\u4e3b", 2 => "\u516c\u53f8\u6267\u884c\u5b98", _ => "AI\u6838\u5fc3" },
-		MaxHp = 120 + act * 50, PreferredRow = FormationRow.Front, IsBoss = true,
-		IntentPatterns = [
-			new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 15 + act * 5, Weight = 0.35f },
-			new EnemyIntentPattern { Type = EnemyIntentType.AttackDefend, Value = 12 + act * 3, Weight = 0.25f },
-			new EnemyIntentPattern { Type = EnemyIntentType.Buff, Value = 4, Weight = 0.15f },
-			new EnemyIntentPattern { Type = EnemyIntentType.Debuff, Value = 3, Weight = 0.15f },
-			new EnemyIntentPattern { Type = EnemyIntentType.Special, Value = 20 + act * 8, Weight = 0.1f }],
-		Phases = [new EnemyPhase { HpThreshold = 0.5f, EntryEffect = "\u8fdb\u5165\u72c2\u66b4\u72b6\u6001\uff01",
-			IntentPatterns = [
-				new EnemyIntentPattern { Type = EnemyIntentType.Attack, Value = 20 + act * 7, Weight = 0.5f },
-				new EnemyIntentPattern { Type = EnemyIntentType.Special, Value = 25 + act * 10, Weight = 0.3f },
-				new EnemyIntentPattern { Type = EnemyIntentType.Buff, Value = 5, Weight = 0.2f }] }]
-	};
 
 	// ======================================================================
 	//  ENEMY PANELS
@@ -744,6 +1358,19 @@ public partial class CombatScene : Control
 		}
 	}
 
+	private void AddEnemyPanel(Enemy enemy)
+	{
+		var panel = new EnemyPanel(enemy);
+		_enemyArea.AddChild(panel.Root);
+		_enemyPanels.Add(panel);
+		panel.ClickArea.GuiInput += (ev) =>
+		{
+			if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+				OnEnemyClicked(enemy);
+		};
+	}
+
+
 	// ======================================================================
 	//  CARD FAN LAYOUT
 	// ======================================================================
@@ -753,6 +1380,7 @@ public partial class CombatScene : Control
 		RefreshPlayerInfo();
 		RefreshEnemies();
 		RefreshDeckInfo();
+		RefreshCardPreview();
 		_turnLabel.Text = $"TURN {_turnNumber}";
 	}
 
@@ -760,7 +1388,7 @@ public partial class CombatScene : Control
 	{
 		foreach (var child in _handArea.GetChildren()) child.QueueFree();
 		_cardButtons.Clear();
-		_hoveredCardIndex = -1;
+		ClearHoveredCardState();
 		if (_deck == null || _player == null || _combat == null) return;
 
 		var cards = _deck.Hand.ToList();
@@ -771,9 +1399,11 @@ public partial class CombatScene : Control
 
 		float areaWidth = _handArea.Size.X;
 		float areaHeight = _handArea.Size.Y;
+		float fanAngle = GetFanAngleForHand(count);
+		float fanLift = GetFanLiftForHand(count);
 
-		// Calculate spacing: cards overlap more when many
-		float cardSpacing = MathF.Min(CardWidth * CardOverlap, (areaWidth - CardWidth) / MathF.Max(count - 1, 1));
+		// Small and medium hands get more breathing room; dense hands compress gracefully.
+		float cardSpacing = GetCardSpacingForHand(count, areaWidth);
 		float totalWidth = (count - 1) * cardSpacing + CardWidth;
 		float startX = (areaWidth - totalWidth) / 2f;
 
@@ -784,202 +1414,318 @@ public partial class CombatScene : Control
 
 			// Fan angle: cards at edges rotate outward
 			float centerOffset = i - (count - 1) / 2f;
-			float angle = centerOffset * FanAngle;
-			float lift = -MathF.Abs(centerOffset) * (FanLift / MathF.Max(count / 2f, 1));
+			float angle = centerOffset * fanAngle;
+			float lift = -MathF.Abs(centerOffset) * (fanLift / MathF.Max(count / 2f, 1));
 
 			float x = startX + i * cardSpacing;
 			float y = areaHeight - CardHeight + lift;
 
-			var cardUI = CreateCardUI(card, idx);
-			cardUI.Position = new Vector2(x, y);
-			cardUI.Rotation = Mathf.DegToRad(angle);
-			cardUI.PivotOffset = new Vector2(CardWidth / 2, CardHeight); // bottom center pivot
+			var cardUI = CreateCardUI(card, idx, out var cardVisual);
+			cardUI.Position = new Vector2(x - HoverSidePadding, y - HoverLift - HoverTopPadding);
 			cardUI.ZIndex = i;
+			cardVisual.Rotation = Mathf.DegToRad(angle);
 
 			_handArea.AddChild(cardUI);
-			_cardButtons[card] = cardUI;
+			_cardButtons[card] = cardVisual;
 		}
+
+		if (DebugHandRenderDump)
+			CallDeferred(nameof(DumpHandRenderState));
 	}
 
-	private Control CreateCardUI(Card card, int handIndex)
+	private Control CreateCardUI(Card card, int handIndex, out Control visualCard)
 	{
 		bool canPlay = _combat!.CanPlay(_player!, card);
 		bool selected = _selectedCard == card;
-		var tc = GetCardTypeColor(card);
+		var baseVisualPosition = GetCardVisualBasePosition();
+		var hoveredVisualPosition = GetCardVisualHoverPosition();
 
-		var outer = new PanelContainer();
-		outer.CustomMinimumSize = new Vector2(CardWidth, CardHeight);
-		outer.Size = new Vector2(CardWidth, CardHeight);
+		var hitbox = new Control();
+		hitbox.CustomMinimumSize = new Vector2(CardHitboxWidth, CardHitboxHeight);
+		hitbox.Size = new Vector2(CardHitboxWidth, CardHitboxHeight);
 
-		Color bg = canPlay ? new Color(0.04f, 0.04f, 0.07f, 0.97f) : new Color(0.03f, 0.03f, 0.05f, 0.75f);
-		Color bd = selected ? Colors.White : (canPlay ? tc * 0.5f : tc * 0.15f);
-
-		var style = new StyleBoxFlat
+		var cardVisualShell = CyberCardFactory.CreateGameplayCard(
+			card,
+			new Vector2(CardWidth, CardHeight),
+			compact: true,
+			dimmed: false,
+			footer: card.IsPositionReactive ? "前后排效果不同" : null,
+			showDescription: true,
+			selected: selected,
+			minimalCompactStyle: false,
+			opaqueCompactStyle: false,
+			neutralCompactStyle: true,
+			debugLayerMarkers: DebugRenderLayers);
+		var outer = cardVisualShell.Root;
+		var style = cardVisualShell.Style;
+		var tc = cardVisualShell.Accent;
+		outer.Position = baseVisualPosition;
+		outer.PivotOffset = new Vector2(CardWidth / 2, CardHeight);
+		if (!canPlay)
 		{
-			BgColor = bg, BorderColor = bd,
-			BorderWidthBottom = selected ? 2 : 1, BorderWidthTop = selected ? 2 : 1,
-			BorderWidthLeft = selected ? 2 : 1, BorderWidthRight = selected ? 2 : 1,
-			CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
-			CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6,
-			ShadowColor = canPlay ? tc * 0.15f : Colors.Transparent,
-			ShadowSize = canPlay ? 3 : 0
-		};
-		outer.AddThemeStyleboxOverride("panel", style);
-
-		var vbox = new VBoxContainer();
-		vbox.AddThemeConstantOverride("separation", 1);
-
-		// --- Card art area (top portion with illustration) ---
-		var artContainer = new PanelContainer();
-		artContainer.CustomMinimumSize = new Vector2(0, 55);
-		var artBg = new StyleBoxFlat
-		{
-			BgColor = canPlay ? tc * 0.12f : tc * 0.04f,
-			CornerRadiusTopLeft = 5, CornerRadiusTopRight = 5,
-			ContentMarginLeft = 4, ContentMarginRight = 4,
-			ContentMarginTop = 2, ContentMarginBottom = 2
-		};
-		artContainer.AddThemeStyleboxOverride("panel", artBg);
-
-		// Card art texture
-		var artTexRect = new TextureRect
-		{
-			Texture = LoadTex(GetCardArtPath(card.Data.Type)),
-			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-			StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-			SizeFlagsVertical = SizeFlags.ExpandFill,
-			Modulate = canPlay ? Colors.White : new Color(1, 1, 1, 0.3f),
-		};
-		artContainer.AddChild(artTexRect);
-
-		// Cost orb overlaid on art (top-left)
-		var costOrb = new PanelContainer();
-		costOrb.SetAnchorsPreset(LayoutPreset.TopLeft);
-		costOrb.OffsetLeft = 3; costOrb.OffsetTop = 3;
-		costOrb.OffsetRight = 27; costOrb.OffsetBottom = 25;
-		var costStyle = new StyleBoxFlat
-		{
-			BgColor = canPlay ? new Color(0f, 0.12f, 0.18f, 0.92f) : new Color(0.06f, 0.06f, 0.08f, 0.7f),
-			BorderColor = canPlay ? new Color(0f, 0.7f, 0.8f) : new Color(0.2f, 0.2f, 0.25f),
-			BorderWidthBottom = 1, BorderWidthTop = 1, BorderWidthLeft = 1, BorderWidthRight = 1,
-			CornerRadiusBottomLeft = 10, CornerRadiusBottomRight = 10,
-			CornerRadiusTopLeft = 10, CornerRadiusTopRight = 10,
-			ContentMarginLeft = 4, ContentMarginRight = 4,
-		};
-		costOrb.AddThemeStyleboxOverride("panel", costStyle);
-		var costLbl = new Label
-		{
-			Text = card.EffectiveCost.ToString(),
-			HorizontalAlignment = HorizontalAlignment.Center,
-			VerticalAlignment = VerticalAlignment.Center,
-		};
-		costLbl.AddThemeFontSizeOverride("font_size", 16);
-		costLbl.AddThemeColorOverride("font_color", canPlay ? new Color(0f, 1f, 1f) : new Color(0.3f, 0.3f, 0.35f));
-		costOrb.AddChild(costLbl);
-		artContainer.AddChild(costOrb);
-
-		vbox.AddChild(artContainer);
-
-		// --- Card name ---
-		var nameLbl = new Label
-		{
-			Text = card.DisplayName,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			AutowrapMode = TextServer.AutowrapMode.WordSmart
-		};
-		nameLbl.AddThemeFontSizeOverride("font_size", 11);
-		nameLbl.AddThemeColorOverride("font_color", canPlay ? Colors.White : new Color(0.35f, 0.35f, 0.4f));
-		vbox.AddChild(nameLbl);
-
-		// --- Divider ---
-		vbox.AddChild(new ColorRect { Color = canPlay ? tc * 0.3f : tc * 0.08f, CustomMinimumSize = new Vector2(0, 1) });
-
-		// --- Description ---
-		var desc = new Label
-		{
-			Text = card.ActiveDescription,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			AutowrapMode = TextServer.AutowrapMode.WordSmart,
-			SizeFlagsVertical = SizeFlags.ExpandFill
-		};
-		desc.AddThemeFontSizeOverride("font_size", 9);
-		desc.AddThemeColorOverride("font_color", canPlay ? new Color(0.65f, 0.65f, 0.7f) : new Color(0.25f, 0.25f, 0.3f));
-		vbox.AddChild(desc);
-
-		// --- Bottom accent ---
-		vbox.AddChild(new ColorRect { Color = canPlay ? tc * 0.4f : tc * 0.1f, CustomMinimumSize = new Vector2(0, 2) });
-		outer.AddChild(vbox);
+			style.BorderColor = new Color(style.BorderColor.R, style.BorderColor.G, style.BorderColor.B, 0.4f);
+			style.ShadowColor = new Color(0f, 0f, 0f, 0.08f);
+			style.ShadowSize = Math.Max(style.ShadowSize - 2, 2);
+		}
+		SetMouseFilterRecursive(outer, MouseFilterEnum.Ignore);
+		hitbox.AddChild(outer);
 
 		// === HOVER ===
+		hitbox.MouseEntered += () => UpdateCardPreview(card, canPlay, _selectedCard == card);
+		hitbox.MouseExited += () => RefreshCardPreview();
+
 		if (canPlay)
 		{
-			outer.MouseDefaultCursorShape = CursorShape.PointingHand;
-			outer.MouseEntered += () =>
+			hitbox.MouseDefaultCursorShape = CursorShape.PointingHand;
+			hitbox.MouseEntered += () =>
 			{
 				if (_inputLocked) return;
 
-				if (_hoveredCardControl != null && _hoveredCardControl != outer && _hoveredCardIndex >= 0)
-				{
-					var prev = _hoveredCardControl;
-					int prevIdx = _hoveredCardIndex;
-					int prevCount = _deck?.Hand.Count ?? 0;
-					float prevCenterOffset = prevIdx - (prevCount - 1) / 2f;
-					float prevAngle = prevCenterOffset * FanAngle;
-					float prevLiftVal = -MathF.Abs(prevCenterOffset) * (FanLift / MathF.Max(prevCount / 2f, 1));
-					float prevY = _handArea.Size.Y - CardHeight + prevLiftVal;
-
-					var ptw = prev.CreateTween();
-					ptw.TweenProperty(prev, "position:y", prevY, 0.05f);
-					ptw.Parallel().TweenProperty(prev, "scale", Vector2.One, 0.05f);
-					ptw.Parallel().TweenProperty(prev, "rotation", Mathf.DegToRad(prevAngle), 0.04f);
-					prev.ZIndex = prevIdx;
-				}
+				if (_hoveredCardVisual != null && _hoveredCardVisual != outer && _hoveredCardIndex >= 0)
+					ResetHoveredCardVisual(clearState: false);
 
 				_hoveredCardIndex = handIndex;
-				_hoveredCardControl = outer;
+				_hoveredCardHitbox = hitbox;
+				_hoveredCardVisual = outer;
+				_hoveredCardStyle = style;
+				_hoveredCardBaseBorderColor = style.BorderColor;
+				_hoveredCardBaseShadowColor = style.ShadowColor;
 				var tw = outer.CreateTween();
-				tw.TweenProperty(outer, "position:y", outer.Position.Y - HoverLift, 0.1f)
+				tw.TweenProperty(outer, "position", hoveredVisualPosition, 0.1f)
 					.SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
 				tw.Parallel().TweenProperty(outer, "scale", new Vector2(HoverScale, HoverScale), 0.1f)
 					.SetTrans(Tween.TransitionType.Cubic);
 				tw.Parallel().TweenProperty(outer, "rotation", 0f, 0.08f);
-				outer.ZIndex = 100;
-				style.ShadowSize = 10;
+				hitbox.ZIndex = 100;
+				style.ShadowSize = 12;
 				style.ShadowColor = tc * 0.35f;
-				style.BorderColor = canPlay ? tc : bd;
+				style.BorderColor = Colors.White;
 			};
-			outer.MouseExited += () =>
+			hitbox.MouseExited += () =>
 			{
-				if (_hoveredCardControl == outer)
-				{
-					_hoveredCardIndex = -1;
-					_hoveredCardControl = null;
-				}
-				int count = _deck?.Hand.Count ?? 0;
-				float centerOffset = handIndex - (count - 1) / 2f;
-				float angle = centerOffset * FanAngle;
-				float lift = -MathF.Abs(centerOffset) * (FanLift / MathF.Max(count / 2f, 1));
-				float y = _handArea.Size.Y - CardHeight + lift;
-
-				var tw = outer.CreateTween();
-				tw.TweenProperty(outer, "position:y", y, 0.08f);
-				tw.Parallel().TweenProperty(outer, "scale", Vector2.One, 0.08f);
-				tw.Parallel().TweenProperty(outer, "rotation", Mathf.DegToRad(angle), 0.06f);
-				outer.ZIndex = handIndex;
-				style.ShadowSize = 3;
-				style.ShadowColor = tc * 0.15f;
-				style.BorderColor = bd;
+				if (_hoveredCardVisual == outer)
+					ResetHoveredCardVisual();
 			};
 		}
 
-		outer.GuiInput += (ev) =>
+		hitbox.GuiInput += (ev) =>
 		{
 			if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
 				OnCardClicked(card);
 		};
 
-		return outer;
+		visualCard = outer;
+		return hitbox;
+	}
+
+	private void ResetHoveredCardVisual(bool clearState = true)
+	{
+		if (_hoveredCardVisual == null || _hoveredCardStyle == null || _hoveredCardIndex < 0)
+		{
+			if (clearState)
+				ClearHoveredCardState();
+			return;
+		}
+
+		int count = _deck?.Hand.Count ?? 0;
+		float centerOffset = _hoveredCardIndex - (count - 1) / 2f;
+		float angle = centerOffset * GetFanAngleForHand(count);
+
+		var tw = _hoveredCardVisual.CreateTween();
+		tw.TweenProperty(_hoveredCardVisual, "position", GetCardVisualBasePosition(), 0.08f);
+		tw.Parallel().TweenProperty(_hoveredCardVisual, "scale", Vector2.One, 0.08f);
+		tw.Parallel().TweenProperty(_hoveredCardVisual, "rotation", Mathf.DegToRad(angle), 0.06f);
+
+		if (_hoveredCardHitbox != null)
+			_hoveredCardHitbox.ZIndex = _hoveredCardIndex;
+
+		_hoveredCardStyle.ShadowSize = 3;
+		_hoveredCardStyle.ShadowColor = _hoveredCardBaseShadowColor;
+		_hoveredCardStyle.BorderColor = _hoveredCardBaseBorderColor;
+
+		if (clearState)
+			ClearHoveredCardState();
+	}
+
+	private void ClearHoveredCardState()
+	{
+		_hoveredCardIndex = -1;
+		_hoveredCardHitbox = null;
+		_hoveredCardVisual = null;
+		_hoveredCardStyle = null;
+		_hoveredCardBaseBorderColor = Colors.Transparent;
+		_hoveredCardBaseShadowColor = Colors.Transparent;
+	}
+
+	private static Vector2 GetCardVisualBasePosition() => new(HoverSidePadding, HoverLift + HoverTopPadding);
+
+	private static Vector2 GetCardVisualHoverPosition() => new(HoverSidePadding, HoverTopPadding);
+
+	private void DumpHandRenderState()
+	{
+		if (!DebugHandRenderDump || _deck == null)
+			return;
+
+		_handRenderDumpSequence++;
+		var cards = _deck.Hand.ToList();
+		GD.Print($"[HandRenderDump] ===== begin #{_handRenderDumpSequence} cards={cards.Count} =====");
+
+		// 1) Walk ancestor chain from HandArea up to root
+		var ancestorMod = Colors.White;
+		Node? cur = _handArea;
+		while (cur != null)
+		{
+			if (cur is CanvasItem ci)
+			{
+				var hasMat = ci.Material != null;
+				GD.Print($"[HandRenderDump] ANCESTOR {ci.Name}<{ci.GetType().Name}> mod={FormatColor(ci.Modulate)} self={FormatColor(ci.SelfModulate)} hasMaterial={hasMat}");
+				ancestorMod = MultiplyColor(ancestorMod, MultiplyColor(ci.Modulate, ci.SelfModulate));
+			}
+			cur = cur.GetParent();
+		}
+		GD.Print($"[HandRenderDump] ACCUMULATED_ANCESTOR_MOD={FormatColor(ancestorMod)}");
+
+		// 2) List all direct children of CombatScene (this) to find overlays above HandArea
+		int handIdx = _handArea.GetIndex();
+		GD.Print($"[HandRenderDump] HandArea index={handIdx}, scene children={GetChildCount()}");
+		for (int c = 0; c < GetChildCount(); c++)
+		{
+			var child = GetChild(c);
+			string line = $"[HandRenderDump] SCENE_CHILD[{c}] {SanitizeForDump(child.Name)}<{child.GetType().Name}>";
+			if (child is CanvasItem ci2)
+			{
+				line += $" z={ci2.ZIndex} visible={ci2.Visible}";
+				if (ci2.Material != null) line += " HAS_MATERIAL";
+			}
+			if (child is Control ctrl)
+				line += $" anchors=({ctrl.AnchorLeft:F2},{ctrl.AnchorTop:F2},{ctrl.AnchorRight:F2},{ctrl.AnchorBottom:F2})";
+			if (c == handIdx) line += " <<< HAND";
+			GD.Print(line);
+		}
+
+		// 3) Dump first card only (reduce log spam)
+		if (cards.Count > 0 && _handArea.GetChildCount() > 0 && _handArea.GetChild(0) is Control hitbox)
+		{
+			var card = cards[0];
+			GD.Print($"[HandRenderDump] CARD[0] {card.Data.Id}#{card.InstanceId} / {card.DisplayName}");
+			DumpCanvasItemTree(hitbox, 0, ancestorMod);
+		}
+
+		GD.Print($"[HandRenderDump] ===== end #{_handRenderDumpSequence} =====");
+	}
+
+	private void DumpCanvasItemTree(CanvasItem item, int depth, Color inheritedModulate)
+	{
+		Color localModulate = item.Modulate;
+		Color selfModulate = item.SelfModulate;
+		Color branchModulate = MultiplyColor(inheritedModulate, localModulate);
+		Color finalModulate = MultiplyColor(branchModulate, selfModulate);
+		string indent = new(' ', depth * 2);
+		string renderSource = DescribeCanvasItemRender(item, finalModulate);
+
+		GD.Print(
+			$"[HandRenderDump] {indent}{item.Name}<{item.GetType().Name}> " +
+			$"visible={item.Visible} z={item.ZIndex} " +
+			$"mod={FormatColor(localModulate)} self={FormatColor(selfModulate)} final={FormatColor(finalModulate)}" +
+			(renderSource.Length > 0 ? $" {renderSource}" : string.Empty));
+
+		foreach (var child in item.GetChildren())
+		{
+			if (child is CanvasItem childCanvasItem)
+				DumpCanvasItemTree(childCanvasItem, depth + 1, branchModulate);
+		}
+	}
+
+	private static string DescribeCanvasItemRender(CanvasItem item, Color finalModulate)
+	{
+		var parts = new List<string>();
+
+		switch (item)
+		{
+			case ColorRect colorRect:
+				parts.Add($"color={FormatColor(colorRect.Color)}");
+				parts.Add($"rendered={FormatColor(MultiplyColor(colorRect.Color, finalModulate))}");
+				break;
+
+			case PanelContainer panelContainer when panelContainer.GetThemeStylebox("panel") is StyleBoxFlat panelStyle:
+				parts.Add($"bg={FormatColor(panelStyle.BgColor)}");
+				parts.Add($"bgRendered={FormatColor(MultiplyColor(panelStyle.BgColor, finalModulate))}");
+				parts.Add($"border={FormatColor(panelStyle.BorderColor)}");
+				parts.Add($"borderRendered={FormatColor(MultiplyColor(panelStyle.BorderColor, finalModulate))}");
+				break;
+
+			case Label label:
+				Color fontColor = label.GetThemeColor("font_color");
+				parts.Add($"font={FormatColor(fontColor)}");
+				parts.Add($"fontRendered={FormatColor(MultiplyColor(fontColor, finalModulate))}");
+				parts.Add($"text=\"{SanitizeForDump(label.Text)}\"");
+				break;
+
+			case TextureRect textureRect:
+				parts.Add($"texture={(textureRect.Texture?.ResourcePath ?? "<generated>")}");
+				break;
+		}
+
+		return string.Join(" | ", parts);
+	}
+
+	private static string SanitizeForDump(string text)
+	{
+		return text
+			.Replace("\r", string.Empty)
+			.Replace("\n", "\\n")
+			.Replace("\"", "'");
+	}
+
+	private static Color MultiplyColor(Color left, Color right)
+	{
+		return new Color(
+			left.R * right.R,
+			left.G * right.G,
+			left.B * right.B,
+			left.A * right.A);
+	}
+
+	private static string FormatColor(Color color)
+	{
+		return $"({color.R:0.###},{color.G:0.###},{color.B:0.###},{color.A:0.###})";
+	}
+
+	private static float GetCardSpacingForHand(int count, float areaWidth)
+	{
+		if (count <= 1)
+			return 0f;
+
+		float targetRatio = count switch
+		{
+			<= 4 => 0.92f,
+			<= 6 => 0.84f,
+			<= 8 => 0.78f,
+			_ => MinDenseHandSpacingRatio
+		};
+
+		float targetSpacing = CardWidth * targetRatio;
+		float availableSpacing = (areaWidth - CardWidth) / MathF.Max(count - 1, 1);
+		return MathF.Min(targetSpacing, availableSpacing);
+	}
+
+	private static float GetFanAngleForHand(int count)
+	{
+		float density = Mathf.Clamp((count - 1) / 8f, 0f, 1f);
+		return Mathf.Lerp(BaseFanAngle, DenseHandFanAngle, density);
+	}
+
+	private static float GetFanLiftForHand(int count)
+	{
+		float density = Mathf.Clamp((count - 1) / 8f, 0f, 1f);
+		return Mathf.Lerp(BaseFanLift, DenseHandFanLift, density);
+	}
+
+	private static void SetMouseFilterRecursive(Control control, MouseFilterEnum mouseFilter)
+	{
+		control.MouseFilter = mouseFilter;
+		foreach (var child in control.GetChildren().OfType<Control>())
+			SetMouseFilterRecursive(child, mouseFilter);
 	}
 
 	// ======================================================================
@@ -988,18 +1734,32 @@ public partial class CombatScene : Control
 	private void OnCardClicked(Card card)
 	{
 		if (_inputLocked || _combat == null || _player == null) return;
-		if (!_combat.CanPlay(_player, card)) return;
+		if (_selectedCard == card)
+		{
+			CancelCardSelection("已取消选牌");
+			return;
+		}
+
+		if (!_combat.CanPlay(_player, card))
+		{
+			UpdateCardPreview(card, false);
+			ShowToast(GetCardPlayBlockReason(card), new Color(1f, 0.55f, 0.35f));
+			return;
+		}
 
 		AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
 
-		if (card.Data.TargetType is TargetType.Self or TargetType.None or TargetType.AllEnemies or
+		if (card.Data.EffectiveTargetType is TargetType.Self or TargetType.None or TargetType.AllEnemies or
 			TargetType.FrontRowEnemies or TargetType.BackRowEnemies)
 		{
+			HideSelectionHint();
 			PlayCardAnimated(card, null);
 		}
 		else
 		{
 			_selectedCard = card;
+			UpdateCardPreview(card, true, true);
+			ShowSelectionHint($"选择目标：{GetTargetTypeText(card.Data.EffectiveTargetType)} · 右键或 Esc 取消");
 			HighlightValidTargets();
 			RefreshHand();
 		}
@@ -1040,7 +1800,24 @@ public partial class CombatScene : Control
 			? _combat.TryPlayCard(_player, card, target)
 			: _combat.TryPlayCard(_player, card);
 
-		if (!success) { _inputLocked = false; _selectedCard = null; RefreshAll(); return; }
+		if (!success)
+		{
+			_inputLocked = false;
+			if (target != null)
+			{
+				ShowToast("该目标当前不可选", new Color(1f, 0.55f, 0.35f));
+				HighlightValidTargets();
+				RefreshCardPreview();
+				return;
+			}
+
+			_selectedCard = null;
+			HideSelectionHint();
+			RefreshAll();
+			return;
+		}
+
+		HideSelectionHint();
 
 		AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardPlay);
 
@@ -1191,7 +1968,7 @@ public partial class CombatScene : Control
 		{
 			bool valid = _selectedCard != null && _combat != null &&
 				_combat.Targeting.GetValidTargets(
-					_player!, _selectedCard.Data.TargetType, _selectedCard.Data.Range,
+					_player!, _selectedCard.Data.EffectiveTargetType, _selectedCard.Data.Range,
 					_combat.Enemies.Where(e => e.IsAlive),
 					_combat.Players.Where(p => p.IsAlive))
 				.Contains(panel.Enemy);
@@ -1207,7 +1984,231 @@ public partial class CombatScene : Control
 			AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
 			RefreshAll();
 		}
+		else
+		{
+			ShowToast(GetSwitchRowBlockReason(), new Color(1f, 0.55f, 0.35f));
+		}
 	}
+
+	private string GetSwitchRowBlockReason()
+	{
+		if (_player == null || _combat == null)
+			return "当前无法换位";
+
+		if (_player.Powers.HasPower(RogueCardGame.Core.Combat.Powers.CommonPowerIds.Rooted))
+			return "已被锁定，不能换位";
+
+		if (_combat.Formation.HasMovedThisTurn(_player.Id))
+			return "本回合已经换位";
+
+		if (_player.CurrentEnergy < 1)
+			return "换位需要 1 点能量";
+
+		return "当前无法换位";
+	}
+
+	// ======================================================================
+	//  PILE VIEWER OVERLAY (STS2-style: click pile panel to preview cards)
+	// ======================================================================
+	private void BuildPileViewerOverlay()
+	{
+		// Full-screen semi-transparent backdrop — clicking outside the modal closes the viewer
+		_pileViewerBackdrop = new ColorRect
+		{
+			Color = new Color(0f, 0f, 0f, 0.72f),
+			Visible = false,
+			ZIndex = 200,
+		};
+		_pileViewerBackdrop.SetAnchorsPreset(LayoutPreset.FullRect);
+		_pileViewerBackdrop.GuiInput += ev =>
+		{
+			if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+				HidePileViewer();
+		};
+		AddChild(_pileViewerBackdrop);
+
+		// Centered modal panel (MouseFilter.Stop prevents clicks propagating to backdrop)
+		var modal = new PanelContainer { MouseFilter = MouseFilterEnum.Stop };
+		modal.SetAnchorsPreset(LayoutPreset.FullRect);
+		modal.AnchorLeft = 0.08f; modal.AnchorRight = 0.92f;
+		modal.AnchorTop = 0.05f; modal.AnchorBottom = 0.95f;
+		modal.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.04f, 0.05f, 0.09f, 0.98f),
+			BorderColor = new Color(0.22f, 0.38f, 0.58f, 0.78f),
+			BorderWidthBottom = 2, BorderWidthTop = 2,
+			BorderWidthLeft = 2, BorderWidthRight = 2,
+			CornerRadiusBottomLeft = 10, CornerRadiusBottomRight = 10,
+			CornerRadiusTopLeft = 10, CornerRadiusTopRight = 10,
+			ContentMarginLeft = 14, ContentMarginRight = 14,
+			ContentMarginTop = 12, ContentMarginBottom = 12,
+		});
+
+		var root = new VBoxContainer();
+		root.AddThemeConstantOverride("separation", 8);
+
+		// Header: title + count note + close button
+		var header = new HBoxContainer();
+		header.AddThemeConstantOverride("separation", 10);
+
+		_pileViewerTitle = new Label
+		{
+			SizeFlagsHorizontal = SizeFlags.Expand,
+			VerticalAlignment = VerticalAlignment.Center,
+		};
+		_pileViewerTitle.AddThemeFontSizeOverride("font_size", 18);
+		_pileViewerTitle.AddThemeColorOverride("font_color", new Color(0.84f, 0.94f, 1f));
+		header.AddChild(_pileViewerTitle);
+
+		_pileViewerCountNote = new Label { VerticalAlignment = VerticalAlignment.Center };
+		_pileViewerCountNote.AddThemeFontSizeOverride("font_size", 13);
+		_pileViewerCountNote.AddThemeColorOverride("font_color", new Color(0.5f, 0.62f, 0.72f));
+		header.AddChild(_pileViewerCountNote);
+
+		var closeBtn = new Button { Text = "✕  关闭", CustomMinimumSize = new Vector2(80, 0) };
+		closeBtn.AddThemeFontSizeOverride("font_size", 13);
+		closeBtn.Pressed += HidePileViewer;
+		header.AddChild(closeBtn);
+		root.AddChild(header);
+
+		// Tab buttons: draw / discard / exhaust / full deck
+		var tabBar = new HBoxContainer();
+		tabBar.AddThemeConstantOverride("separation", 4);
+		string[] tabNames = ["抽牌堆", "弃牌堆", "消耗堆", "全牌库"];
+		_pileViewerTabBtns = new Button[4];
+		for (int i = 0; i < 4; i++)
+		{
+			int idx = i;
+			var btn = new Button
+			{
+				Text = tabNames[i],
+				ToggleMode = true,
+				CustomMinimumSize = new Vector2(90, 0),
+			};
+			btn.AddThemeFontSizeOverride("font_size", 13);
+			btn.Pressed += () =>
+			{
+				_currentPileViewMode = (PileViewMode)idx;
+				PopulatePileViewer(_currentPileViewMode);
+				UpdatePileViewerTabs();
+			};
+			tabBar.AddChild(btn);
+			_pileViewerTabBtns[i] = btn;
+		}
+		root.AddChild(tabBar);
+
+		// Scrollable list of card entries
+		// HorizontalScrollMode must be Disabled to prevent AutowrapMode labels from collapsing to zero height
+		var scroll = new ScrollContainer
+		{
+			SizeFlagsVertical = SizeFlags.ExpandFill,
+			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+		};
+		_pileViewerCardList = new HFlowContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		_pileViewerCardList.AddThemeConstantOverride("h_separation", 8);
+		_pileViewerCardList.AddThemeConstantOverride("v_separation", 8);
+		scroll.AddChild(_pileViewerCardList);
+		root.AddChild(scroll);
+
+		modal.AddChild(root);
+		_pileViewerBackdrop.AddChild(modal);
+	}
+
+	private void ShowPileViewer(PileViewMode mode)
+	{
+		if (_pileViewerBackdrop == null || _deck == null) return;
+		_currentPileViewMode = mode;
+		PopulatePileViewer(mode);
+		UpdatePileViewerTabs();
+		_pileViewerBackdrop.Visible = true;
+	}
+
+	private void HidePileViewer()
+	{
+		if (_pileViewerBackdrop != null)
+			_pileViewerBackdrop.Visible = false;
+	}
+
+	private void PopulatePileViewer(PileViewMode mode)
+	{
+		if (_pileViewerCardList == null || _pileViewerTitle == null || _pileViewerCountNote == null || _deck == null)
+			return;
+
+		foreach (Node child in _pileViewerCardList.GetChildren().ToArray())
+		{
+			_pileViewerCardList.RemoveChild(child);
+			child.Free();
+		}
+
+		IEnumerable<Card> cards;
+		string title;
+		string note;
+
+		switch (mode)
+		{
+			case PileViewMode.DrawPile:
+				cards = _deck.DrawPile;
+				title = "抽牌堆";
+				note = "（顺序已随机化）";
+				break;
+			case PileViewMode.DiscardPile:
+				cards = _deck.DiscardPile;
+				title = "弃牌堆";
+				note = "";
+				break;
+			case PileViewMode.ExhaustPile:
+				cards = _deck.ExhaustPile;
+				title = "消耗堆";
+				note = "（已从牌库永久移除）";
+				break;
+			default: // FullDeck
+				cards = _deck.DrawPile
+					.Concat(_deck.Hand)
+					.Concat(_deck.DiscardPile)
+					.Concat(_deck.ExhaustPile)
+					.OrderBy(c => c.Data.Type)
+					.ThenBy(c => c.Data.Cost)
+					.ThenBy(c => c.DisplayName);
+				title = "全牌库";
+				note = $"（抽 {_deck.DrawPile.Count} · 手 {_deck.Hand.Count} · 弃 {_deck.DiscardPile.Count} · 消耗 {_deck.ExhaustPile.Count}）";
+				break;
+		}
+
+		var cardList = cards.ToList();
+		_pileViewerTitle.Text = title;
+		_pileViewerCountNote.Text = $"{cardList.Count} 张  {note}";
+
+		if (cardList.Count == 0)
+		{
+			var empty = new Label { Text = "（空）", HorizontalAlignment = HorizontalAlignment.Center };
+			empty.AddThemeColorOverride("font_color", new Color(0.45f, 0.5f, 0.55f));
+			_pileViewerCardList.AddChild(empty);
+			return;
+		}
+
+		foreach (var card in cardList)
+		{
+			var visual = CyberCardFactory.CreateGameplayCard(
+				card, new Vector2(140, 195), compact: true, showDescription: true);
+			visual.Root.MouseFilter = MouseFilterEnum.Ignore;
+			_pileViewerCardList.AddChild(visual.Root);
+		}
+	}
+
+	private void UpdatePileViewerTabs()
+	{
+		if (_pileViewerTabBtns == null || _deck == null) return;
+		int totalDeck = _deck.DrawPile.Count + _deck.Hand.Count + _deck.DiscardPile.Count + _deck.ExhaustPile.Count;
+		int[] counts = [_deck.DrawPile.Count, _deck.DiscardPile.Count, _deck.ExhaustPile.Count, totalDeck];
+		string[] baseNames = ["抽牌堆", "弃牌堆", "消耗堆", "全牌库"];
+		for (int i = 0; i < _pileViewerTabBtns.Length; i++)
+		{
+			_pileViewerTabBtns[i].Text = $"{baseNames[i]}({counts[i]})";
+			_pileViewerTabBtns[i].ButtonPressed = _currentPileViewMode == (PileViewMode)i;
+		}
+	}
+
+
 
 	// ======================================================================
 	//  REFRESH
@@ -1256,10 +2257,12 @@ public partial class CombatScene : Control
 		var resName = _player.EffectiveClassResourceName;
 		_resourceBadge.Text = !string.IsNullOrEmpty(resName) ? $"{resName}: {_player.ClassResourceValue}" : "";
 
-		// Player powers
+		// Player powers — skip the power that's already shown in the class resource badge
+		var classResPowerId = _player.ClassResourcePowerId;
 		var playerPowers = new List<string>();
 		foreach (var power in _player.Powers.Powers)
 		{
+			if (power.PowerId == classResPowerId) continue; // already shown in resource badge
 			string pIcon = power.IsDebuff ? "\u25bc" : "\u25b2";
 			playerPowers.Add($"{pIcon}{power.Name}:{power.Amount}");
 		}
@@ -1268,8 +2271,9 @@ public partial class CombatScene : Control
 		var row = _combat.Formation.GetPosition(_player.Id);
 		_rowLabel.Text = row == FormationRow.Front ? "\u2694 \u524d\u6392" : "\ud83c\udfaf \u540e\u6392";
 		_rowLabel.AddThemeColorOverride("font_color", row == FormationRow.Front ? new Color(1f, 0.55f, 0.2f) : new Color(0.35f, 0.7f, 0.95f));
-		_switchRowBtn.Text = _player.CurrentEnergy >= 1 ? "\u5207\u6362\u9635\u578b" : "\u80fd\u91cf\u4e0d\u8db3";
+		_switchRowBtn.Text = _combat.Formation.HasMovedThisTurn(_player.Id) ? "\u5df2\u6362\u4f4d" : _player.CurrentEnergy >= 1 ? "\u5207\u6362\u9635\u578b" : "\u80fd\u91cf\u4e0d\u8db3";
 		_switchRowBtn.Disabled = _player.CurrentEnergy < 1 || _player.Powers.HasPower(RogueCardGame.Core.Combat.Powers.CommonPowerIds.Rooted);
+		UpdateFormationHint();
 
 		_topBar?.Refresh();
 	}
@@ -1316,15 +2320,27 @@ public partial class CombatScene : Control
 			if (isBoss)
 			{
 				if (run.CurrentAct >= 3)
+				{
+					GameManager.Instance.EndCurrentRun(true);
 					SceneManager.Instance.ChangeScene(SceneManager.Scenes.Victory);
-				else { run.AdvanceAct(); SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map); }
+				}
+				else
+				{
+					run.CurrentSceneId = "map";
+					run.AdvanceAct();
+					GameManager.Instance.SaveCurrentRun();
+					SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
+				}
 			}
 			else
+			{
+				GameManager.Instance.SetCurrentRunScene("reward");
 				SceneManager.Instance.ChangeScene(SceneManager.Scenes.Reward);
+			}
 		}
 		else
 		{
-			run.EndRun(false);
+			GameManager.Instance.EndCurrentRun(false);
 			SceneManager.Instance.ChangeScene(SceneManager.Scenes.GameOver);
 		}
 	}
@@ -1345,6 +2361,7 @@ public partial class CombatScene : Control
 		private readonly TextureRect _intentIcon;
 		private readonly Label _intentValueLabel;
 		private readonly PanelContainer _intentBadge;
+		private readonly Label _intentDetailLabel;
 		private readonly Label _statusText;
 		private readonly PanelContainer _highlightBorder;
 
@@ -1392,6 +2409,16 @@ public partial class CombatScene : Control
 
 			_intentBadge.AddChild(intentHbox);
 			Root.AddChild(_intentBadge);
+
+			_intentDetailLabel = new Label
+			{
+				HorizontalAlignment = HorizontalAlignment.Center,
+				AutowrapMode = TextServer.AutowrapMode.WordSmart,
+				CustomMinimumSize = new Vector2(0, isBoss ? 30 : 24)
+			};
+			_intentDetailLabel.AddThemeFontSizeOverride("font_size", 10);
+			_intentDetailLabel.AddThemeColorOverride("font_color", new Color(0.62f, 0.7f, 0.78f));
+			Root.AddChild(_intentDetailLabel);
 
 			// --- Sprite container with highlight border ---
 			var spriteContainer = new Control();
@@ -1531,6 +2558,7 @@ public partial class CombatScene : Control
 					EnemyIntentType.Buff => "res://resources/textures/ui/intent_buff.svg",
 					EnemyIntentType.Debuff => "res://resources/textures/ui/intent_debuff.svg",
 					EnemyIntentType.Special => "res://resources/textures/ui/intent_special.svg",
+					EnemyIntentType.Disabled => "res://resources/textures/ui/intent_defend.svg",
 					_ => "res://resources/textures/ui/intent_attack.svg"
 				};
 				_intentIcon.Texture = LoadTex(intentTexPath);
@@ -1541,6 +2569,12 @@ public partial class CombatScene : Control
 					EnemyIntentType.Attack => $"{it.Value}" + (it.HitCount > 1 ? $"x{it.HitCount}" : ""),
 					EnemyIntentType.AttackDefend => $"{it.Value}",
 					EnemyIntentType.Defend => $"{it.Value}",
+					EnemyIntentType.Buff => $"+{it.Value}",
+					EnemyIntentType.Debuff => $"-{it.Value}",
+					EnemyIntentType.Heal => $"+{it.Value}",
+					EnemyIntentType.Summon => $"x{Math.Max(1, it.Value)}",
+					EnemyIntentType.Special => "!",
+					EnemyIntentType.Disabled => "\u2718",
 					_ => ""
 				};
 				Color ic = it.Type switch
@@ -1550,15 +2584,33 @@ public partial class CombatScene : Control
 					EnemyIntentType.Defend => new Color(0.35f, 0.65f, 1f),
 					EnemyIntentType.Buff => new Color(0.85f, 0.65f, 0.08f),
 					EnemyIntentType.Debuff => new Color(0.65f, 0.18f, 0.75f),
+					EnemyIntentType.Heal => new Color(0.28f, 0.82f, 0.45f),
+					EnemyIntentType.Summon => new Color(0.8f, 0.82f, 0.92f),
+					EnemyIntentType.Special => new Color(1f, 0.2f, 0.55f),
+					EnemyIntentType.Disabled => new Color(0.45f, 0.45f, 0.5f),
 					_ => new Color(0.6f, 0.6f, 0.6f)
 				};
 				_intentValueLabel.AddThemeColorOverride("font_color", ic);
+				_intentDetailLabel.Text = BuildIntentDetailText(it);
+				ClickArea.TooltipText = _intentDetailLabel.Text;
 				_intentBadge.Visible = true;
 			}
-			else _intentBadge.Visible = false;
+			else
+			{
+				_intentBadge.Visible = false;
+				_intentDetailLabel.Text = "";
+				ClickArea.TooltipText = "";
+			}
 
 			var row = formation.GetPosition(Enemy.Id);
-			_nameLabel.Text = Enemy.Name + (row == FormationRow.Back ? " [\u540e\u6392]" : "");
+			bool isFront = row == FormationRow.Front;
+			_nameLabel.Text = Enemy.Name + (isFront ? " [\u524d\u6392]" : " [\u540e\u6392]");
+
+			// Position boundary visual: front = warm, back = cool
+			Color posColor = isFront
+				? new Color(1f, 0.65f, 0.35f)
+				: new Color(0.35f, 0.65f, 1f);
+			_nameLabel.AddThemeColorOverride("font_color", posColor);
 
 			// Status/power icons
 			var statParts = new List<string>();

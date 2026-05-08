@@ -38,6 +38,12 @@ public enum StatusType
     Thorns,        // Deal X damage to attackers
     PainThreshold, // Gain armor equal to HP lost this turn
     ParasiticBond, // Heal % of damage dealt to marked target
+
+    // Additional status types
+    Rootkit,       // Netrunner: hack progress protection
+    CompileAccel,  // Netrunner: program card cost reduction
+    Mark,          // Psion: target marked for conditional effects
+    MeleeStrength, // Psion: temporary melee-only damage buff
 }
 
 /// <summary>

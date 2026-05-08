@@ -12,6 +12,8 @@ public partial class VictoryScene : Control
 
     public override void _Ready()
     {
+        GameManager.Instance.SetCurrentRunScene("victory");
+
         _title = GetNode<Label>("Title");
         _statsLabel = GetNode<Label>("StatsLabel");
         _menuBtn = GetNode<Button>("MenuBtn");

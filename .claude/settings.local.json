@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -oP '\"[a-zA-Z_]+\\(?=\"$\\)')",
+      "Bash(dpkg -l)",
+      "Bash(g++ --version)",
+      "Bash(cmake --version)",
+      "Bash(python3 *)",
+      "Read(//etc/**)",
+      "Bash(ldd --version)",
+      "Bash(gcc --version)",
+      "Bash(python *)"
+    ]
+  }
+}

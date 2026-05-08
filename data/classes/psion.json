@@ -16,8 +16,9 @@
   },
   "starterDeckCardIds": [
     "psi_bolt", "psi_bolt", "psi_bolt", "psi_bolt",
-    "psi_shield", "psi_shield", "psi_shield", "psi_shield",
-    "focus"
+    "mind_ward", "mind_ward",
+    "psi_focus",
+    "telekinetic_strike", "telekinetic_strike"
   ],
   "unlockCondition": "win_1",
   "color": "#A855F7",

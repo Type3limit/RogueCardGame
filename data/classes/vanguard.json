@@ -16,8 +16,9 @@
   },
   "starterDeckCardIds": [
     "vanguard_strike", "vanguard_strike", "vanguard_strike", "vanguard_strike",
-    "vanguard_defend", "vanguard_defend", "vanguard_defend", "vanguard_defend",
-    "vanguard_charge"
+    "vanguard_defend", "vanguard_defend", "vanguard_defend",
+    "vanguard_charge",
+    "vanguard_overload_release"
   ],
   "unlockCondition": "default",
   "color": "#E63946",

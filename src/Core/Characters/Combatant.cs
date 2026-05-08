@@ -81,24 +81,26 @@ public abstract class Combatant
 
     /// <summary>
     /// Called at the start of each turn.
+    /// Powers no longer fire through the hook wall here — CombatManager publishes
+    /// TriggerKind.AtTurnStart to the CombatEventDispatcher and powers respond
+    /// via their Dispatcher subscriptions.
     /// </summary>
     public virtual void OnTurnStart()
     {
         Block = 0; // Block resets each turn by default
-        Powers.TriggerAtTurnStart();
     }
 
     /// <summary>
-    /// Called at the end of each turn. Powers handle poison, regen, tick-down, etc.
+    /// Called at the end of each turn.
+    /// Powers fire via CombatEventDispatcher (AtTurnEnd); tick-down is handled
+    /// separately by CombatManager calling PowerManager.TickDownPowers().
     /// </summary>
     public virtual void OnTurnEnd()
     {
-        // Powers handle all end-of-turn effects:
-        // - PoisonPower deals damage and ticks down
-        // - RegenerationPower heals and ticks down
-        // - Vulnerable/Weak/Frail tick down
-        // - Custom powers can inject their own behavior
-        Powers.TriggerAtTurnEnd();
+        // In full combat, CombatManager drives power hooks via CombatEventDispatcher (AtTurnEnd).
+        // When called directly (standalone unit tests), fall back to the legacy direct-trigger path.
+        if (Powers.EventBus == null)
+            Powers.TriggerAtTurnEnd();
     }
 
     /// <summary>

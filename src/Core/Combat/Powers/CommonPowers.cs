@@ -1,4 +1,7 @@
+using RogueCardGame.Core;
+using RogueCardGame.Core.Cards;
 using RogueCardGame.Core.Characters;
+using RogueCardGame.Core.Combat;
 using RogueCardGame.Core.Combat.Actions;
 
 namespace RogueCardGame.Core.Combat.Powers;
@@ -37,6 +40,12 @@ public static class CommonPowerIds
 
     // Example extensibility: Doom (from the zhihu analysis)
     public const string Doom = "Doom";
+
+    // Additional status types
+    public const string Mark = "Mark";
+    public const string Rootkit = "Rootkit";
+    public const string CompileAccel = "CompileAccel";
+    public const string MeleeStrength = "MeleeStrength";
 }
 
 // =====================================================================
@@ -178,9 +187,55 @@ public class OverchargePower : AbstractPower
 /// <summary>Psion: skill chain amplifier. Powered skills gain bonus.</summary>
 public class ResonancePower : AbstractPower
 {
+    private bool _skipNextDecay;
+
     public override string PowerId => CommonPowerIds.Resonance;
     public override string Name => "共鸣";
     public override string GetDescription() => $"共鸣层数: {Amount}。连续使用技能时获得增益。";
+
+    public override void AtTurnEnd()
+    {
+        if (Owner == null || Amount <= 0) return;
+
+        bool halfDecay = GetImplantBonus("resonanceDecayHalf") > 0;
+        if (!halfDecay)
+        {
+            Amount = Math.Max(0, Amount - 1);
+            if (Amount == 0)
+                Owner.Powers.RemovePower(PowerId);
+            return;
+        }
+
+        if (_skipNextDecay)
+        {
+            _skipNextDecay = false;
+            return;
+        }
+
+        Amount = Math.Max(0, Amount - 1);
+        _skipNextDecay = true;
+        if (Amount == 0)
+            Owner.Powers.RemovePower(PowerId);
+    }
+}
+
+/// <summary>
+/// Psion: delayed resonance trigger — converts to Resonance stacks at the start of next turn.
+/// Applied by DelayedResonanceEffect. Consumes itself immediately after triggering.
+/// </summary>
+public class GainResonanceNextTurnPower : AbstractPower
+{
+    public override string PowerId => "GainResonanceNextTurn";
+    public override string Name => "蓄积共鸣";
+    public override string GetDescription() => $"下回合开始时获得 {Amount} 层共鸣。";
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null) return;
+        // Convert to Resonance at turn start, then remove self
+        ActionManager?.AddToBottom(new ApplyPowerAction(Owner, new ResonancePower { Amount = Amount }));
+        Owner.Powers.RemovePower(PowerId);
+    }
 }
 
 /// <summary>Netrunner: damage reduction shield.</summary>
@@ -196,18 +251,43 @@ public class FirewallPower : AbstractPower
 /// <summary>Netrunner: protocol stack counter. Cards consume for damage.</summary>
 public class ProtocolStackPower : AbstractPower
 {
+    public int MaxStacks => 10 + GetImplantBonus("protocolStackSize");
+
     public override string PowerId => CommonPowerIds.ProtocolStack;
     public override string Name => "协议栈";
-    public override string GetDescription() => $"协议栈层数: {Amount}。可被消耗卡牌转化为伤害。";
+    public override string GetDescription() => $"协议栈层数: {Amount}/{MaxStacks}。可被消耗卡牌转化为伤害。";
+
+    public override void OnApply()
+    {
+        Amount = Math.Min(Amount, MaxStacks);
+    }
+
+    public override void OnStacksAdded(int addedAmount)
+    {
+        Amount = Math.Min(Amount, MaxStacks);
+    }
 }
 
-/// <summary>Netrunner: hack/intrusion progress on an enemy. At threshold, disables actions.</summary>
+/// <summary>Netrunner: hack/intrusion progress on an enemy. At threshold, stuns the enemy for 1 turn and resets.</summary>
 public class HackedPower : AbstractPower
 {
     public override string PowerId => CommonPowerIds.Hacked;
     public override string Name => "入侵";
-    public override string GetDescription() => $"入侵进度: {Amount}。达到阈值时敌人被控制。";
+    public override string GetDescription() =>
+        $"入侵进度: {Amount}/{BalanceConfig.Current.GlobalBalance.HackThreshold}。达到阈值时敌人被眩晕并重置。";
     public override bool IsDebuff => true;
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null) return;
+        int threshold = BalanceConfig.Current.GlobalBalance.HackThreshold;
+        if (Amount >= threshold)
+        {
+            // Control achieved: stun for 1 turn and reset hack progress
+            ActionManager?.AddToTop(new ApplyPowerAction(Owner, new StunnedPower { Amount = 1 }));
+            Owner.Powers.RemovePower(PowerId);
+        }
+    }
 }
 
 /// <summary>Skip next action. Ticks down.</summary>
@@ -220,17 +300,18 @@ public class StunnedPower : AbstractPower
     public override bool TicksDown => true;
 }
 
-/// <summary>Symbiote: deal X damage back to attackers.</summary>
+/// <summary>Symbiote: deal X damage back to attackers. Damage bypasses block (STS behavior).</summary>
 public class ThornsPower : AbstractPower
 {
     public override string PowerId => CommonPowerIds.Thorns;
     public override string Name => "荆棘";
-    public override string GetDescription() => $"受到攻击时，对攻击者造成 {Amount} 点伤害。";
+    public override string GetDescription() => $"受到攻击时，对攻击者造成 {Amount} 点直接伤害。";
 
-    public override void OnTakeDamage(int amount)
+    public override void OnTakeDamage(int amount, Combatant? attacker = null)
     {
-        // Thorns: retaliate against the attacker (simplified: damage is dealt as action)
-        // Note: In STS thorns fires on attack hit, not on all damage. Simplified here.
+        if (attacker == null || Owner == null || Amount <= 0) return;
+        // Thorns retaliatory damage bypasses block (like STS). Reuse PoisonDamageAction.
+        ActionManager?.AddToTop(new PoisonDamageAction(attacker, Amount));
     }
 }
 
@@ -242,7 +323,7 @@ public class PainThresholdPower : AbstractPower
     public override string GetDescription() => $"本回合每失去 {Amount} HP，获得等量护甲。";
     public override bool TicksDown => true;
 
-    public override void OnTakeDamage(int amount)
+    public override void OnTakeDamage(int amount, Combatant? attacker = null)
     {
         if (Owner == null) return;
         int blockGain = amount * Amount;
@@ -258,6 +339,72 @@ public class ParasiticBondPower : AbstractPower
     public override string GetDescription() => $"受到伤害时，链接源回复伤害的 {Amount}% HP。";
     public override bool IsDebuff => true;
     public override bool TicksDown => true;
+
+    public override void OnTakeDamage(int amount, Combatant? attacker = null)
+    {
+        if (Source == null || Source == Owner || !Source.IsAlive || Amount <= 0 || amount <= 0)
+            return;
+        int heal = Math.Max(1, amount * Amount / 100);
+        ActionManager?.AddToBottom(new HealAction(Source, heal));
+    }
+}
+
+/// <summary>Psion Mark: marks a target. Unlike Vulnerable it does not modify damage; used by cost/kill conditions.</summary>
+public class MarkPower : AbstractPower
+{
+    public override string PowerId => CommonPowerIds.Mark;
+    public override string Name => "标记";
+    public override string GetDescription() => $"被标记。剩余 {Amount} 回合。";
+    public override bool IsDebuff => true;
+    public override bool TicksDown => true;
+}
+
+/// <summary>Symbiote-internal: rootkit/compile helpers as ticking debuff/buff (placeholder stacks).</summary>
+public class RootkitPower : AbstractPower
+{
+    public override string PowerId => CommonPowerIds.Rootkit;
+    public override string Name => "Rootkit";
+    public override string GetDescription() => $"入侵保护 {Amount} 层。";
+    public override bool IsDebuff => false;
+}
+
+public class CompileAccelPower : AbstractPower
+{
+    public override string PowerId => CommonPowerIds.CompileAccel;
+    public override string Name => "编译加速";
+    public override string GetDescription() => $"本回合下 {Amount} 张「程序」卡费用 -1。";
+    public override bool IsDebuff => false;
+
+    public override int ModifyCardCost(Card card, int baseCost, Combatant? target)
+    {
+        if (Amount > 0 && card.Data.Type == CardType.Skill)
+            return Math.Max(0, baseCost - 1);
+        return baseCost;
+    }
+
+    public override void OnCardPlayed(Card card)
+    {
+        if (Amount > 0 && card.Data.Type == CardType.Skill)
+        {
+            Amount--;
+            if (Amount <= 0 && Owner != null)
+                ActionManager?.AddToBottom(new RemovePowerDelayedAction(Owner, PowerId));
+        }
+    }
+}
+
+public class MeleeStrengthPower : AbstractPower
+{
+    public override string PowerId => CommonPowerIds.MeleeStrength;
+    public override string Name => "近战强化";
+    public override string GetDescription() => $"近战攻击伤害 +{Amount}（回合结束失效）。";
+    public override bool IsDebuff => false;
+
+    public override void AtTurnEnd()
+    {
+        if (Owner != null)
+            ActionManager?.AddToBottom(new RemovePowerDelayedAction(Owner, PowerId));
+    }
 }
 
 // =====================================================================
@@ -319,9 +466,16 @@ public class PoisonDamageAction : GameAction
         int hpDamage = Math.Min(Amount, Target.CurrentHp);
         Target.CurrentHp = Math.Max(0, Target.CurrentHp - Amount);
         if (hpDamage > 0)
-            Target.Powers.TriggerOnTakeDamage(hpDamage);
+        {
+            Manager?.Combat?.Events.Publish(new CombatEvent
+            {
+                Kind = TriggerKind.OnTakeDamage, Target = Target, Amount = hpDamage
+            });
+        }
         if (!Target.IsAlive)
-            Target.Powers.TriggerOnDeath();
+        {
+            Manager?.Combat?.Events.Publish(new CombatEvent { Kind = TriggerKind.OnDeath, Actor = Target });
+        }
         IsDone = true;
     }
 }
@@ -358,6 +512,10 @@ public static class PowerFactory
             StatusType.Thorns => new ThornsPower(),
             StatusType.PainThreshold => new PainThresholdPower(),
             StatusType.ParasiticBond => new ParasiticBondPower(),
+            StatusType.Mark => new MarkPower(),
+            StatusType.Rootkit => new RootkitPower(),
+            StatusType.CompileAccel => new CompileAccelPower(),
+            StatusType.MeleeStrength => new MeleeStrengthPower(),
             _ => throw new ArgumentException($"Unknown status type: {type}")
         };
         power.Amount = amount;
@@ -386,6 +544,10 @@ public static class PowerFactory
         CommonPowerIds.Thorns => StatusType.Thorns,
         CommonPowerIds.PainThreshold => StatusType.PainThreshold,
         CommonPowerIds.ParasiticBond => StatusType.ParasiticBond,
+        CommonPowerIds.Mark => StatusType.Mark,
+        CommonPowerIds.Rootkit => StatusType.Rootkit,
+        CommonPowerIds.CompileAccel => StatusType.CompileAccel,
+        CommonPowerIds.MeleeStrength => StatusType.MeleeStrength,
         _ => null
     };
 
@@ -411,6 +573,259 @@ public static class PowerFactory
         StatusType.Thorns => CommonPowerIds.Thorns,
         StatusType.PainThreshold => CommonPowerIds.PainThreshold,
         StatusType.ParasiticBond => CommonPowerIds.ParasiticBond,
+        StatusType.Mark => CommonPowerIds.Mark,
+        StatusType.Rootkit => CommonPowerIds.Rootkit,
+        StatusType.CompileAccel => CommonPowerIds.CompileAccel,
+        StatusType.MeleeStrength => CommonPowerIds.MeleeStrength,
         _ => type.ToString()
     };
+}
+
+/// <summary>Buff power: heals the owner when they kill an enemy.</summary>
+public class HealOnKillPower : AbstractPower
+{
+    public override string PowerId => "HealOnKill";
+    public override string Name => "击杀回复";
+    public override bool IsDebuff => false;
+    public override string GetDescription() => $"击杀时回复 {Amount} 点生命";
+
+    public override void OnKill(Combatant victim)
+    {
+        if (Owner != null)
+            ActionManager?.AddToBottom(new HealAction(Owner, Amount));
+    }
+}
+
+/// <summary>Buff power: amplifies the next Resonance consume by +Amount damage per stack.</summary>
+public class ResonanceAmplifyPower : AbstractPower
+{
+    public override string PowerId => "ResonanceAmplify";
+    public override string Name => "共鸣增幅";
+    public override bool IsDebuff => false;
+    public override string GetDescription() => $"下次消耗共鸣时每层额外 +{Amount} 伤害";
+
+    public override float ModifyConsumeResonanceDamage(float damage, int stacks)
+    {
+        float bonus = stacks * Amount;
+        ActionManager?.Combat?.Log?.Invoke($"[共鸣增幅] 消耗 {stacks} 层共鸣, 每层+{Amount} 额外伤害 = +{bonus}");
+        // Remove self after amplifying (it's a one-time buff)
+        if (Owner != null)
+            ActionManager?.AddToBottom(new RemovePowerDelayedAction(Owner, PowerId));
+        return damage + bonus;
+    }
+}
+
+// =====================================================================
+//  CLASS-SPECIFIC PERMANENT POWERS (from card applyPower effects)
+// =====================================================================
+
+/// <summary>Vanguard: front row gain Overcharge each turn; consuming Overcharge deals extra damage.</summary>
+public class FrontlineCommanderPower : AbstractPower
+{
+    public override string PowerId => "FrontlineCommander";
+    public override string Name => "前线指挥";
+    public override string GetDescription() => $"你在前排时，每回合开始获得 {Amount} 层超载。消耗超载时每层额外造成 1 点伤害。";
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null) return;
+        // Only grant Overcharge when in the front row (card text: "你在前排时")
+        var formation = ActionManager?.Combat?.Formation;
+        if (formation != null && formation.GetPosition(Owner.Id) != FormationRow.Front)
+            return;
+        ActionManager?.AddToBottom(new ApplyPowerAction(Owner, new OverchargePower { Amount = Amount }));
+    }
+
+    public override float ModifyOverchargeConsumeDamage(float damage, int stacks)
+        => damage + stacks;
+}
+
+/// <summary>Vanguard: consuming Overcharge grants 1 block per stack and draws 1 card per 3 stacks.</summary>
+public class WarMachinePower : AbstractPower
+{
+    public override string PowerId => "WarMachine";
+    public override string Name => "战争机器";
+    public override string GetDescription() => "消耗超载时每层获得 1 点护甲。每消耗 3 层抽 1 张牌。";
+
+    public override void OnOverchargeConsumed(int stacks)
+    {
+        if (Owner == null || stacks <= 0) return;
+        ActionManager?.AddToBottom(new GainBlockAction(Owner, stacks));
+        int draws = stacks / 3;
+        if (draws > 0 && Owner is PlayerCharacter p)
+        {
+            var deck = ActionManager?.Combat?.PlayerDecks.GetValueOrDefault(p.Id);
+            if (deck != null)
+                ActionManager?.AddToBottom(new DrawCardAction(p, draws, deck));
+        }
+    }
+}
+
+/// <summary>Psion: gain Resonance each turn; Resonance >= 5 grants bonus attack damage.</summary>
+public class ResonanceEnginePower : AbstractPower
+{
+    public override string PowerId => "ResonanceEngine";
+    public override string Name => "共鸣引擎";
+    public override string GetDescription() => $"每回合开始获得 {Amount} 层共鸣。共鸣 ≥ 5 时攻击伤害 +3。";
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null) return;
+        ActionManager?.AddToBottom(new ApplyPowerAction(Owner, new ResonancePower { Amount = Amount }));
+    }
+
+    public override float ModifyAttackDamage(float baseDamage)
+    {
+        int resonance = Owner?.Powers.GetStacks(CommonPowerIds.Resonance) ?? 0;
+        return resonance >= 5 ? baseDamage + 3 : baseDamage;
+    }
+}
+
+/// <summary>Psion: Resonance also grants +1 damage per stack to attacks; Resonance decays 2 per turn.</summary>
+public class TranscendentPsionPower : AbstractPower
+{
+    public override string PowerId => "TranscendentPsion";
+    public override string Name => "超灵者";
+    public override string GetDescription() => "每层共鸣使攻击伤害 +1。共鸣每回合末减少 2 层。";
+
+    public override float ModifyAttackDamage(float baseDamage)
+    {
+        int resonance = Owner?.Powers.GetStacks(CommonPowerIds.Resonance) ?? 0;
+        return baseDamage + resonance;
+    }
+
+    public override void AtTurnEnd()
+    {
+        if (Owner == null) return;
+        int resonance = Owner.Powers.GetStacks(CommonPowerIds.Resonance);
+        if (resonance > 0)
+        {
+            int decay = Math.Min(2, resonance);
+            Owner.Powers.ConsumeStacks(CommonPowerIds.Resonance, decay);
+        }
+    }
+}
+
+/// <summary>Psion: auto-mark all enemies each turn; attacking marked enemies costs -1; kill marked heals 3.</summary>
+public class MindSovereignPower : AbstractPower
+{
+    public override string PowerId => "MindSovereign";
+    public override string Name => "心灵主宰";
+    public override string GetDescription() => "每回合标记所有敌人。攻击被标记敌人费用 -1。击杀回复 3 HP。";
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null || ActionManager?.Combat == null) return;
+        foreach (var enemy in ActionManager.Combat.Enemies.Where(e => e.IsAlive))
+            ActionManager.AddToBottom(new ApplyPowerAction(enemy, new MarkPower { Amount = 1 }));
+    }
+
+    public override int ModifyCardCost(Card card, int baseCost, Combatant? target)
+    {
+        if (card.Data.Type == CardType.Attack && target != null && target.Powers.HasPower(CommonPowerIds.Mark))
+            return Math.Max(0, baseCost - 1);
+        return baseCost;
+    }
+
+    public override void OnKill(Combatant victim)
+    {
+        if (Owner != null && victim.Powers.HasPower(CommonPowerIds.Mark))
+            ActionManager?.AddToBottom(new HealAction(Owner, 3));
+    }
+}
+
+/// <summary>Netrunner: gain ProtocolStack each turn if played >= 2 program cards last turn.</summary>
+public class PassiveScanPower : AbstractPower
+{
+    public override string PowerId => "PassiveScan";
+    public override string Name => "被动扫描";
+    public override string GetDescription() => "若上回合打出 ≥ 2 张「程序」牌，获得 2 层协议栈。";
+    private int _programCardsLastTurn;
+    private int _programCardsThisTurn;
+
+    public override void OnCardPlayed(Card card)
+    {
+        if (card.Data.Type == CardType.Skill)
+            _programCardsThisTurn++;
+    }
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null) return;
+        if (_programCardsLastTurn >= 2)
+            ActionManager?.AddToBottom(new ApplyPowerAction(Owner, new ProtocolStackPower { Amount = 2 }));
+        _programCardsLastTurn = _programCardsThisTurn;
+        _programCardsThisTurn = 0;
+    }
+}
+
+/// <summary>Netrunner: gain block each turn equal to ProtocolStack (max 5).</summary>
+public class FirewallAbilityPower : AbstractPower
+{
+    public override string PowerId => "FirewallAbility";
+    public override string Name => "防火墙";
+    public override string GetDescription() => "每回合开始获得等同于协议栈层数的护甲（最多 5 点）。";
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null) return;
+        int stacks = Owner.Powers.GetStacks(CommonPowerIds.ProtocolStack);
+        int block = Math.Min(5, stacks);
+        if (block > 0)
+            ActionManager?.AddToBottom(new GainBlockAction(Owner, block));
+    }
+}
+
+/// <summary>Netrunner: playing program cards grants +1 ProtocolStack.</summary>
+public class PersistentLinkPower : AbstractPower
+{
+    public override string PowerId => "PersistentLink";
+    public override string Name => "持久连接";
+    public override string GetDescription() => "打出「程序」牌时额外获得 1 层协议栈。";
+
+    public override void OnCardPlayed(Card card)
+    {
+        if (card.Data.Type == CardType.Skill && Owner != null)
+            ActionManager?.AddToBottom(new ApplyPowerAction(Owner, new ProtocolStackPower { Amount = 1 }));
+    }
+}
+
+/// <summary>Symbiote: losing HP deals damage to a random enemy (50% of HP lost).</summary>
+public class TacticalErosionPower : AbstractPower
+{
+    public override string PowerId => "TacticalErosion";
+    public override string Name => "战术侵蚀";
+    public override string GetDescription() => "每次失去 HP 时，对随机敌人造成失去 HP 50% 的伤害。";
+
+    public override void OnTakeDamage(int amount, Combatant? attacker = null)
+    {
+        if (Owner == null || ActionManager?.Combat == null || amount <= 0) return;
+        int damage = Math.Max(1, amount / 2);
+        var enemies = ActionManager.Combat.Enemies.Where(e => e.IsAlive).ToList();
+        if (enemies.Count > 0)
+        {
+            var rng = new Random();
+            var target = enemies[rng.Next(enemies.Count)];
+            ActionManager.AddToTop(new DealDamageAction(Owner, [target], damage));
+        }
+    }
+}
+
+/// <summary>Symbiote: if HP below 50%, gain Strength and Energy at turn start.</summary>
+public class BloodRitualPower : AbstractPower
+{
+    public override string PowerId => "BloodRitual";
+    public override string Name => "血之仪式";
+    public override string GetDescription() => "回合开始时，若 HP < 50%，获得 1 层力量和 1 能量。";
+
+    public override void AtTurnStart()
+    {
+        if (Owner == null) return;
+        if (Owner.CurrentHp <= Owner.MaxHp / 2)
+        {
+            ActionManager?.AddToBottom(new ApplyPowerAction(Owner, new StrengthPower { Amount = 1 }));
+            if (Owner is PlayerCharacter player)
+                ActionManager?.AddToBottom(new GainEnergyAction(player, 1));
+        }
+    }
 }

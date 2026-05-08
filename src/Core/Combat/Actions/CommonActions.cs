@@ -46,6 +46,7 @@ public class DealDamageAction : GameAction
             damage *= Formation.GetDamageMultiplier(Source.Id, Range);
 
         int finalDamage = Math.Max(0, (int)damage);
+        int totalHpDamage = 0;
 
         // Step 2: Apply to each target
         foreach (var target in Targets.Where(t => t.IsAlive))
@@ -59,21 +60,46 @@ public class DealDamageAction : GameAction
             target.Block -= blocked;
             int hpDamage = incoming - blocked;
             target.CurrentHp = Math.Max(0, target.CurrentHp - hpDamage);
+            totalHpDamage += hpDamage;
 
-            // Trigger hooks
+            // Trigger hooks — via Dispatcher when in full combat; fall back to direct PowerManager
+            // trigger when running in standalone tests without a CombatManager/Dispatcher.
+            var bus = Manager?.Combat?.Events;
             if (hpDamage > 0)
             {
-                Source.Powers.TriggerOnDealDamage(target, hpDamage);
-                target.Powers.TriggerOnTakeDamage(hpDamage);
+                if (bus != null)
+                {
+                    bus.Publish(new CombatEvent { Kind = TriggerKind.OnDealDamage, Actor = Source, Target = target, Amount = hpDamage });
+                    bus.Publish(new CombatEvent { Kind = TriggerKind.OnTakeDamage, Actor = Source, Target = target, Amount = hpDamage });
+                }
+                else
+                {
+                    Source.Powers.TriggerOnDealDamage(target, hpDamage);
+                    target.Powers.TriggerOnTakeDamage(hpDamage);
+                }
                 Aggro?.AddAggro(Source.Id, hpDamage * AggroSystem.AggroPerDamage);
             }
 
             // Check kill
             if (!target.IsAlive)
             {
-                target.Powers.TriggerOnDeath();
-                Source.Powers.TriggerOnKill(target);
+                if (bus != null)
+                {
+                    bus.Publish(new CombatEvent { Kind = TriggerKind.OnKill, Actor = Source, Target = target });
+                    bus.Publish(new CombatEvent { Kind = TriggerKind.OnDeath, Actor = target });
+                }
+                else
+                {
+                    Source.Powers.TriggerOnKill(target);
+                    target.Powers.TriggerOnDeath();
+                }
             }
+        }
+
+        if (Manager?.CurrentEffectContext != null)
+        {
+            Manager.CurrentEffectContext.LastDamageDealt = totalHpDamage;
+            Manager.CurrentEffectContext.TotalDamageDealtThisCard += totalHpDamage;
         }
 
         IsDone = true;
@@ -157,7 +183,12 @@ public class DrawCardAction : GameAction
         if (Deck == null) { IsDone = true; return; }
         var drawn = Deck.Draw(Count);
         foreach (var card in drawn)
-            Player.Powers.TriggerOnCardDrawn(card);
+        {
+            Manager?.Combat?.Events.Publish(new CombatEvent
+            {
+                Kind = TriggerKind.OnCardDrawn, Actor = Player, Card = card
+            });
+        }
         IsDone = true;
     }
 }
@@ -169,16 +200,17 @@ public class ApplyPowerAction : GameAction
 {
     public Combatant Target { get; }
     public AbstractPower Power { get; }
+    public Combatant? Source { get; }
 
-    public ApplyPowerAction(Combatant target, AbstractPower power)
+    public ApplyPowerAction(Combatant target, AbstractPower power, Combatant? source = null)
     {
-        Target = target; Power = power;
+        Target = target; Power = power; Source = source;
         Duration = ActionType.Instant;
     }
 
     public override void Execute()
     {
-        Target.Powers.ApplyPower(Power, Target);
+        Target.Powers.ApplyPower(Power, Target, Source);
         IsDone = true;
     }
 }
@@ -224,7 +256,12 @@ public class HealAction : GameAction
         Target.CurrentHp = Math.Min(Target.MaxHp, Target.CurrentHp + Amount);
         int healed = Target.CurrentHp - before;
         if (healed > 0)
-            Target.Powers.TriggerOnHeal(healed);
+        {
+            Manager?.Combat?.Events.Publish(new CombatEvent
+            {
+                Kind = TriggerKind.OnHeal, Target = Target, Amount = healed
+            });
+        }
         IsDone = true;
     }
 }
@@ -346,9 +383,17 @@ public class OverchargeConsumeAction : GameAction
     public override void Execute()
     {
         int stacks = Source.Powers.GetStacks(CommonPowerIds.Overcharge);
-        int totalDamage = BaseDamage + stacks * DamagePerStack;
+        int baseTotal = BaseDamage + stacks * DamagePerStack;
+        int totalDamage = Math.Max(0, (int)Source.Powers.ModifyOverchargeConsumeDamage(baseTotal, stacks));
         if (stacks > 0)
+        {
             Source.Powers.RemovePower(CommonPowerIds.Overcharge);
+            var bus = Manager?.Combat?.Events;
+            if (bus != null)
+                bus.Publish(new CombatEvent { Kind = TriggerKind.OnOverchargeConsumed, Actor = Source, Amount = stacks });
+            else
+                Source.Powers.TriggerOnOverchargeConsumed(stacks); // fallback for standalone tests
+        }
 
         AddToTop(new DealDamageAction(Source, Targets, totalDamage, Range, Formation, Aggro));
         IsDone = true;
@@ -387,6 +432,68 @@ public class DashDamageAction : GameAction
 }
 
 /// <summary>
+/// Deal self-damage to a combatant, bypassing block (direct HP loss).
+/// Used by Symbiote self-harm effects and implant turn-damage.
+/// </summary>
+public class SelfDamageAction : GameAction
+{
+    public Combatant Target { get; }
+    public int Amount { get; }
+
+    public SelfDamageAction(Combatant target, int amount)
+    {
+        Target = target; Amount = amount;
+        Duration = ActionType.Instant;
+    }
+
+    public override void Execute()
+    {
+        // Self-damage bypasses block and goes directly to HP (min 1 — can't kill via self-damage)
+        int before = Target.CurrentHp;
+        Target.CurrentHp = Math.Max(1, Target.CurrentHp - Amount);
+        int actualLoss = Math.Max(0, before - Target.CurrentHp);
+        if (actualLoss > 0)
+        {
+            Manager?.Combat?.Events.Publish(new CombatEvent
+            {
+                Kind = TriggerKind.OnTakeDamage, Target = Target, Amount = actualLoss
+            });
+        }
+
+        if (Manager?.CurrentEffectContext != null)
+        {
+            Manager.CurrentEffectContext.LastSelfHpLoss = actualLoss;
+            Manager.CurrentEffectContext.TotalSelfHpLossThisCard += actualLoss;
+        }
+
+        IsDone = true;
+    }
+}
+
+/// <summary>
+/// Modify a combatant's MaxHp by a delta (can be negative).
+/// Clamps CurrentHp so it never exceeds the new MaxHp.
+/// </summary>
+public class ModifyMaxHpAction : GameAction
+{
+    public Combatant Target { get; }
+    public int Delta { get; }
+
+    public ModifyMaxHpAction(Combatant target, int delta)
+    {
+        Target = target; Delta = delta;
+        Duration = ActionType.Instant;
+    }
+
+    public override void Execute()
+    {
+        Target.MaxHp = Math.Max(1, Target.MaxHp + Delta);
+        Target.CurrentHp = Math.Min(Target.CurrentHp, Target.MaxHp);
+        IsDone = true;
+    }
+}
+
+/// <summary>
 /// Execute a "doom check" — kill enemies whose Doom stacks >= current HP.
 /// Used by the Doom power system as a proof of extensibility.
 /// </summary>
@@ -410,11 +517,34 @@ public class DoomExecuteAction : GameAction
             {
                 // Execute! Set HP to 0 directly (not damage — bypasses block, strength, etc.)
                 target.CurrentHp = 0;
-                target.Powers.TriggerOnDeath();
+                Manager?.Combat?.Events.Publish(new CombatEvent { Kind = TriggerKind.OnDeath, Actor = target });
                 if (Source != null)
-                    Source.Powers.TriggerOnKill(target);
+                    Manager?.Combat?.Events.Publish(new CombatEvent { Kind = TriggerKind.OnKill, Actor = Source, Target = target });
             }
         }
         IsDone = true;
     }
 }
+
+/// <summary>
+/// Remove a power from a combatant via the Action queue so the removal is ordered
+/// with other queued actions (used by Resonance-amplify one-shot powers).
+/// </summary>
+public class RemovePowerDelayedAction : GameAction
+{
+    public Combatant Target { get; }
+    public string PowerId { get; }
+
+    public RemovePowerDelayedAction(Combatant target, string powerId)
+    {
+        Target = target; PowerId = powerId;
+        Duration = ActionType.Instant;
+    }
+
+    public override void Execute()
+    {
+        Target.Powers.RemovePower(PowerId);
+        IsDone = true;
+    }
+}
+

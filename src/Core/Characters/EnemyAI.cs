@@ -56,7 +56,9 @@ public class EnemyAI
             Value = selected.Value,
             HitCount = selected.HitCount,
             Scope = selected.Scope,
+            StatusId = selected.StatusId,
             Keywords = selected.Keywords,
+            SummonId = selected.SummonId,
             Description = selected.Description ?? GetDefaultDescription(selected)
         };
     }
@@ -69,6 +71,7 @@ public class EnemyAI
         EnemyIntent intent,
         TargetingSystem targeting,
         List<PlayerCharacter> players,
+        List<Enemy> enemies,
         FormationSystem formation,
         AggroSystem aggro)
     {
@@ -88,15 +91,24 @@ public class EnemyAI
                 break;
 
             case EnemyIntentType.Buff:
-                enemy.StatusEffects.Apply(StatusType.Strength, intent.Value);
+                ExecuteBuff(enemy, intent, enemies);
                 break;
 
             case EnemyIntentType.Debuff:
-                ExecuteDebuff(enemy, intent, targeting, players);
+                ExecuteDebuff(enemy, intent, targeting, players, formation);
                 break;
 
             case EnemyIntentType.Heal:
-                enemy.Heal(intent.Value);
+                ExecuteHeal(enemy, intent, enemies);
+                break;
+
+            case EnemyIntentType.Summon:
+                // Summon is handled at CombatManager level via EnemyFactory.
+                // EnemyAI signals the intent; CombatManager calls the factory and AddEnemy.
+                break;
+
+            case EnemyIntentType.Disabled:
+                // Melee enemy in back row — wastes turn, does nothing
                 break;
         }
     }
@@ -193,13 +205,60 @@ public class EnemyAI
         Enemy enemy,
         EnemyIntent intent,
         TargetingSystem targeting,
+        List<PlayerCharacter> players,
+        FormationSystem formation)
+    {
+        var debuff = ResolveStatusType(intent.StatusId, StatusType.Weak);
+
+        IEnumerable<PlayerCharacter> targets = intent.Scope switch
+        {
+            TargetScope.All => players.Where(p => p.IsAlive),
+            TargetScope.AllFront => players.Where(p => p.IsAlive && formation.GetPosition(p.Id) == FormationRow.Front),
+            TargetScope.AllBack => players.Where(p => p.IsAlive && formation.GetPosition(p.Id) == FormationRow.Back),
+            _ => ResolveSingleTarget(targeting, intent.Scope, players).Take(1)
+        };
+
+        foreach (var target in targets)
+            target.StatusEffects.Apply(debuff, intent.Value, 1);
+    }
+
+    private static void ExecuteBuff(Enemy enemy, EnemyIntent intent, List<Enemy> enemies)
+    {
+        var buff = ResolveStatusType(intent.StatusId, StatusType.Strength);
+        IEnumerable<Enemy> targets = intent.Scope == TargetScope.AllEnemies
+            ? enemies.Where(e => e.IsAlive)
+            : [enemy];
+
+        foreach (var target in targets)
+            target.StatusEffects.Apply(buff, intent.Value);
+    }
+
+    private static void ExecuteHeal(Enemy enemy, EnemyIntent intent, List<Enemy> enemies)
+    {
+        IEnumerable<Enemy> targets = intent.Scope == TargetScope.AllEnemies
+            ? enemies.Where(e => e.IsAlive)
+            : [enemy];
+
+        foreach (var target in targets)
+            target.Heal(intent.Value);
+    }
+
+    private static IEnumerable<PlayerCharacter> ResolveSingleTarget(
+        TargetingSystem targeting,
+        TargetScope scope,
         List<PlayerCharacter> players)
     {
-        var target = targeting.AutoSelectTarget(intent.Scope, players.Where(p => p.IsAlive));
-        if (target != null)
-        {
-            target.StatusEffects.Apply(StatusType.Weak, intent.Value);
-        }
+        var target = targeting.AutoSelectTarget(scope, players.Where(p => p.IsAlive));
+        return target is PlayerCharacter player ? [player] : [];
+    }
+
+    private static StatusType ResolveStatusType(string? statusId, StatusType fallback)
+    {
+        if (!string.IsNullOrWhiteSpace(statusId)
+            && Enum.TryParse<StatusType>(statusId, true, out var parsed))
+            return parsed;
+
+        return fallback;
     }
 
     private static string GetDefaultDescription(EnemyIntentPattern pattern)

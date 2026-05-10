@@ -10,6 +10,18 @@
 
 ## 当前阶段: Phase 3 — Roguelike 循环完整性
 
+### 2026-05-10 Phase 3.7 小步推进
+
+- 修复战斗胜利奖励流转：
+  - 普通/精英/Boss 金币由 `RunState.OnCombatVictory` 统一发放并记录 `LastCombatGoldReward`，奖励页只展示实际已发金额，避免双发或显示金额漂移。
+  - Act 1/2 Boss 胜利后进入 `RewardScene`，领奖后再 `AdvanceAct()` 进入下一幕；最终 Boss 仍直接进入胜利结算。
+  - `LastCombatGoldReward` 已纳入 RunState 存档，支持从奖励页继续游戏。
+  - 选择卡牌奖励后不再自动离开奖励页，避免精英/Boss 的植入体或药水奖励来不及领取。
+- `battlefieldInterface` 运行时 hook 已验证：换位免费，换位后下一张牌费用 -1。
+- 接入 `precognitionModule` 战斗场景选择 UI：偶数回合窥视抽牌堆顶 2 张，玩家选择 1 张置于牌堆顶。
+- 新增核心层 Act 烟雾测试：沿地图路径推进一整幕，验证战斗节点能创建敌人/CombatManager，Boss 后能进入下一幕。
+- 验证：`dotnet test` = **52/52 绿**（仍有测试项目 Godot SourceGenerator warning，不影响结果）。
+
 ---
 
 ## Core 架构重构（2026-04-17，完成 P0–P4 + P7，P5 部分，P6 基础）
@@ -89,7 +101,7 @@
 - [x] 5 个核心植入体：vanguard_berserker_core / vanguard_reflector_core / psion_resonance_core / netrunner_protocol_core / symbiote_control_core
 - [x] 设计原则合规：4 个神经植入体已去除数值型叠加（保留纯规则变化）
 - [x] 运行时 hook：energy / drawPerTurn / resonanceDrawBonus / turnStartBlock / precognitionModule（scry） / pulseProcessor / overchargeToStrength / overchargeThorns / turnSelfDamage / overloadCircuit
-- [ ] battlefieldInterface 运行时 hook（数据存在，尚未实现 — 不阻塞 Phase 3）
+- [x] battlefieldInterface 运行时 hook（换位免费 + 下一张牌 -1 费）
 
 ### 事件系统
 
@@ -98,7 +110,7 @@
 
 ### 战斗系统增强
 
-- [x] Scry 机制：precognitionModule 每 2 回合触发，OnScryTriggered 事件 + CompleteScry 回调
+- [x] Scry 机制：precognitionModule 每 2 回合触发，OnScryTriggered 事件 + CompleteScry 回调 + CombatScene 选择 UI
 - [x] DeckManager 新增：DrawPileCount / TakeFromDrawPile / AddToDrawPileBottom
 - [x] pulseProcessor：出牌后立即抽 1 牌（如果手牌未满）
 
@@ -128,6 +140,7 @@
 - [x] 战斗：3 选 1 卡牌 + 金币 + 药水概率掉落
 - [x] 精英：3 选 1 卡 + 2 选 1 植入体
 - [x] Boss：稀有/传奇植入体 + 稀有卡牌选择
+- [x] 奖励流转修复：金币只发一次；Boss 奖励结束后推进下一幕
 
 ### 3.5 事件系统 ✅
 - [x] 11 个事件，覆盖 act 限制 / 一次性事件 / 条件分支
@@ -137,7 +150,7 @@
 - [x] SaveData / GameSettings 数据结构完整
 
 ### 3.7 待验证
-- [ ] 场景间串联端到端测试（地图 → 战斗 → 奖励 → 地图）
+- [ ] 场景间串联端到端测试（地图 → 战斗 → 奖励 → 地图；核心层 Act 烟雾测试已补，仍需 Godot 实机/场景级验证）
 - [ ] Godot 编辑器首次运行调试
 - [ ] 实际游戏平衡性体验（数值是否需要调整）
 
@@ -157,9 +170,7 @@
 
 | 问题 | 位置 | 状态 |
 |------|------|------|
-| battlefieldInterface 无运行时 hook | CombatManager.cs | 待实现 |
-| _postSwitchDiscountReady 字段 write-only | CombatManager.cs | 跟随 battlefieldInterface 一并处理 |
-| Scry 交互为异步但 StartPlayerPhase 同步执行 | CombatManager.cs | 需 Scene 层配合 |
+| 普通 ScryEffect 简化为抽牌 | CardEffect.cs | 预知模块已接 UI，卡牌通用 Scry 待后续统一 |
 | LifestealEffect 治疗量估算不准 | CardEffect.cs | 低优先级 |
 | 美术全是占位 SVG | resources/textures/ | Phase 4 |
 | 音频全是静音 WAV | resources/audio/ | Phase 4 |

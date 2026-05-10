@@ -53,6 +53,7 @@ public partial class CombatScene : Control
 	private Label? _pileViewerCountNote;
 	private HFlowContainer? _pileViewerCardList;
 	private Button[]? _pileViewerTabBtns;
+	private Control? _scryBackdrop;
 
 	// --- Readability / feedback UI ---
 	private PanelContainer _cardPreviewPanel = null!;
@@ -204,6 +205,12 @@ public partial class CombatScene : Control
 
 	public override void _Input(InputEvent ev)
 	{
+		if (_scryBackdrop?.Visible == true && ev.IsActionPressed("ui_cancel"))
+		{
+			GetViewport().SetInputAsHandled();
+			return;
+		}
+
 		// Close pile viewer with Escape (takes priority over card selection cancel)
 		if (_pileViewerBackdrop?.Visible == true && ev.IsActionPressed("ui_cancel"))
 		{
@@ -1316,6 +1323,7 @@ public partial class CombatScene : Control
 		_combat.OnCombatEnded += OnCombatEnded;
 		_combat.OnEnemyAction += (e, i) => GD.Print($"[Combat] {e.Name}: {i.Type} {i.Value}");
 		_combat.OnEnemySummoned += AddEnemyPanel;
+		_combat.OnScryTriggered += ShowScryChoice;
 		_combat.EnemyFactory = run.CreateEnemyById;
 
 		if (_combat.PlayerDecks.TryGetValue(_player.Id, out var deck))
@@ -2208,6 +2216,97 @@ public partial class CombatScene : Control
 		}
 	}
 
+	private void ShowScryChoice(PlayerCharacter player, DeckManager deck, List<Card> peeked, int keepCount)
+	{
+		if (_combat == null || peeked.Count == 0)
+			return;
+
+		HidePileViewer();
+		_scryBackdrop?.QueueFree();
+
+		var backdrop = new ColorRect
+		{
+			Color = new Color(0f, 0f, 0f, 0.76f),
+			ZIndex = 260,
+			MouseFilter = MouseFilterEnum.Stop,
+		};
+		backdrop.SetAnchorsPreset(LayoutPreset.FullRect);
+		AddChild(backdrop);
+		_scryBackdrop = backdrop;
+
+		var modal = new PanelContainer { MouseFilter = MouseFilterEnum.Stop };
+		modal.SetAnchorsPreset(LayoutPreset.FullRect);
+		modal.AnchorLeft = 0.22f; modal.AnchorRight = 0.78f;
+		modal.AnchorTop = 0.16f; modal.AnchorBottom = 0.84f;
+		modal.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.035f, 0.045f, 0.075f, 0.98f),
+			BorderColor = new Color(0.4f, 0.72f, 1f, 0.72f),
+			BorderWidthBottom = 2, BorderWidthTop = 2,
+			BorderWidthLeft = 2, BorderWidthRight = 2,
+			CornerRadiusBottomLeft = 10, CornerRadiusBottomRight = 10,
+			CornerRadiusTopLeft = 10, CornerRadiusTopRight = 10,
+			ContentMarginLeft = 20, ContentMarginRight = 20,
+			ContentMarginTop = 18, ContentMarginBottom = 18,
+			ShadowColor = new Color(0.05f, 0.5f, 1f, 0.18f),
+			ShadowSize = 18,
+		});
+
+		var root = new VBoxContainer();
+		root.AddThemeConstantOverride("separation", 14);
+
+		var title = new Label
+		{
+			Text = "预知模块",
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		title.AddThemeFontSizeOverride("font_size", 28);
+		title.AddThemeColorOverride("font_color", new Color(0.72f, 0.9f, 1f));
+		root.AddChild(title);
+
+		var hint = new Label
+		{
+			Text = keepCount <= 1 ? "选择 1 张置于抽牌堆顶" : $"选择 {keepCount} 张置于抽牌堆顶",
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		hint.AddThemeFontSizeOverride("font_size", 15);
+		hint.AddThemeColorOverride("font_color", new Color(0.55f, 0.66f, 0.78f));
+		root.AddChild(hint);
+
+		var cardsRow = new HBoxContainer
+		{
+			Alignment = BoxContainer.AlignmentMode.Center,
+			SizeFlagsVertical = SizeFlags.ExpandFill,
+		};
+		cardsRow.AddThemeConstantOverride("separation", 18);
+
+		bool resolved = false;
+		foreach (var card in peeked)
+		{
+			var visual = CyberCardFactory.CreateGameplayCard(
+				card, new Vector2(200, 296), compact: false, footer: "置于牌堆顶", showDescription: true);
+			visual.Root.MouseDefaultCursorShape = CursorShape.PointingHand;
+			CyberCardFactory.AttachHover(visual, scale: 1.04f, hoverShadow: 18);
+			visual.Root.GuiInput += ev =>
+			{
+				if (resolved || ev is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+					return;
+
+				resolved = true;
+				_combat.CompleteScry(player, deck, peeked, card);
+				_scryBackdrop?.QueueFree();
+				_scryBackdrop = null;
+				RefreshDeckInfo();
+				ShowToast($"已预知：{card.DisplayName}", new Color(0.58f, 0.82f, 1f));
+			};
+			cardsRow.AddChild(visual.Root);
+		}
+
+		root.AddChild(cardsRow);
+		modal.AddChild(root);
+		backdrop.AddChild(modal);
+	}
+
 
 
 	// ======================================================================
@@ -2317,20 +2416,10 @@ public partial class CombatScene : Control
 			bool isElite = node?.Type == RoomType.EliteCombat;
 			bool isBoss = node?.Type == RoomType.Boss;
 			run.OnCombatVictory(isElite, isBoss);
-			if (isBoss)
+			if (isBoss && run.CurrentAct >= Core.BalanceConfig.Current.MapGeneration.ActsTotal)
 			{
-				if (run.CurrentAct >= 3)
-				{
-					GameManager.Instance.EndCurrentRun(true);
-					SceneManager.Instance.ChangeScene(SceneManager.Scenes.Victory);
-				}
-				else
-				{
-					run.CurrentSceneId = "map";
-					run.AdvanceAct();
-					GameManager.Instance.SaveCurrentRun();
-					SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
-				}
+				GameManager.Instance.EndCurrentRun(true);
+				SceneManager.Instance.ChangeScene(SceneManager.Scenes.Victory);
 			}
 			else
 			{

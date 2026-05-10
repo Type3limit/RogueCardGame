@@ -22,6 +22,7 @@ public partial class RewardScene : Control
     private readonly Dictionary<PanelContainer, CyberCardFactory.CardVisual> _rewardCardVisuals = [];
     private readonly Dictionary<PanelContainer, CardData> _rewardCardDefs = [];
     private TopBarHUD? _topBar;
+    private bool _cardRewardChosen;
 
     public override void _Ready()
     {
@@ -135,16 +136,15 @@ public partial class RewardScene : Control
         bool isElite = node?.Type == RoomType.EliteCombat;
         bool isBoss = node?.Type == RoomType.Boss;
 
-        var gb = BalanceConfig.Current.GlobalBalance;
-        int goldReward = isBoss ? gb.BossGoldReward
-            : isElite ? gb.EliteGoldReward
-            : run.Random.Next(gb.NormalGoldRewardMin, gb.NormalGoldRewardMax);
-        AddRewardItem("💰", $"{goldReward} 金币", new Color(1f, 0.85f, 0.2f), true, () =>
+        int goldReward = run.LastCombatGoldReward;
+        if (goldReward <= 0)
         {
-            run.AddGold(goldReward);
-            AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.GoldGain);
-            _topBar?.Refresh();
-        });
+            var gb = BalanceConfig.Current.GlobalBalance;
+            goldReward = isBoss ? gb.BossGoldReward
+                : isElite ? gb.EliteGoldReward
+                : gb.NormalGoldRewardMin;
+        }
+        AddRewardItem("💰", $"{goldReward} 金币", new Color(1f, 0.85f, 0.2f), true);
 
         // Potion drop
         if (run.Random.NextDouble() < 0.4 && run.Potions.HasEmptySlot())
@@ -336,11 +336,15 @@ public partial class RewardScene : Control
 
     private void OnCardSelected(CardData cardData, PanelContainer selectedPanel)
     {
+        if (_cardRewardChosen) return;
+
         var run = GameManager.Instance.CurrentRun;
         if (run == null) return;
 
+        _cardRewardChosen = true;
         AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardSelect);
         run.AddCardToDeck(cardData);
+        _skipBtn.Text = "返回地图";
 
         if (_rewardCardVisuals.TryGetValue(selectedPanel, out var selectedVisual))
             CyberCardFactory.PlaySelectionConfirm(selectedVisual);
@@ -367,17 +371,32 @@ public partial class RewardScene : Control
             }
         }
 
-        var timer = GetTree().CreateTimer(0.8);
-        timer.Timeout += () =>
-        {
-            GameManager.Instance.SetCurrentRunScene("map");
-            SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
-        };
     }
 
     private void OnSkipPressed()
     {
         AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.ButtonClick);
+        CompleteRewardAndLeave();
+    }
+
+    private void CompleteRewardAndLeave()
+    {
+        var run = GameManager.Instance.CurrentRun;
+        if (run == null) return;
+
+        bool isBossReward = run.CurrentMap?.CurrentNode?.Type == RoomType.Boss;
+        if (isBossReward)
+        {
+            if (run.CurrentAct >= BalanceConfig.Current.MapGeneration.ActsTotal)
+            {
+                GameManager.Instance.EndCurrentRun(true);
+                SceneManager.Instance.ChangeScene(SceneManager.Scenes.Victory);
+                return;
+            }
+
+            run.AdvanceAct();
+        }
+
         GameManager.Instance.SetCurrentRunScene("map");
         SceneManager.Instance.ChangeScene(SceneManager.Scenes.Map);
     }

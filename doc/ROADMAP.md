@@ -8,7 +8,7 @@
 
 ## 当前状态快照
 
-> 最后更新：2026-04-17 | Build: 0 error, warnings only | Test: **29/29 pass** | 核心层 P0-P7 重构已落地
+> 最后更新：2026-05-10 | Build: 0 error, tests warning only | Test: **52/52 pass** | Phase 3 奖励流转、Scry 交互、Act核心烟雾测试修复中
 
 ### 已完成的核心系统
 
@@ -23,7 +23,7 @@
 | 位置反应型卡牌 | `RowConditionalEffect` / `CardEffectFactory` | ✅ 完整 |
 | 卡牌升级 A/B 分支 | `Card.cs` | ✅ 完整 |
 | 原型核心系统 | `PrototypeCoreSystem.cs` | ✅ 完整 |
-| 植入体运行时 | `CombatManager.cs` | ✅ 11/12 hook 已接入 |
+| 植入体运行时 | `CombatManager.cs` / `ImplantBonusPower` | ✅ 11/11 hook 已接入；battlefieldInterface 已补回归 |
 | 敌人 AI | `EnemyAI.cs` / `BossEnemyAI.cs` / `EliteEnemyAI.cs` | ✅ 组合模式，多阶段 |
 | 仇恨系统 | `AggroSystem.cs` | ✅ 完整 |
 | 卡牌数量 | 4 职业 35±2 张 + 18 张位置反应牌 = 161 张 | ✅ Phase 2 达标 |
@@ -41,10 +41,7 @@
 
 | 问题 | 位置 | 优先级 |
 |------|------|--------|
-| `battlefieldInterface` 植入体无运行时 hook | `CombatManager.cs` | Phase 3 |
 | `LifestealEffect` 治疗量估算不准 | `CardEffect.cs` | 低优先级 |
-| Scry 交互异步但 StartPlayerPhase 同步执行 | `CombatManager.cs` | 需 Scene 层 |
-| `_postSwitchDiscountReady` 字段 write-only | `CombatManager.cs` | 跟随 battlefieldInterface |
 | P5 残留：带行为的 core implant 仍硬编码在 `CombatManager` 条件块 | `CombatManager.cs` | 见核心层重构规划 §5 |
 | 美术/音频全占位 | `resources/` | Phase 4 |
 
@@ -98,9 +95,9 @@
 - [x] 6 个神经植入体 + 5 个核心植入体
 - [x] 11 个事件，分支选择 + 条件判断
 - [x] 4 个神经植入体已去除数值型叠加（overload_circuit / pulse_processor / precognition_module）
-- [x] Scry 运行时 hook（precognitionModule）+ DeckManager 扩展（DrawPileCount / TakeFromDrawPile / AddToDrawPileBottom）
+- [x] Scry 运行时 hook（precognitionModule）+ DeckManager 扩展（DrawPileCount / TakeFromDrawPile / AddToDrawPileBottom）+ 战斗场景选择 UI
 - [x] pulseProcessor 运行时 hook（出牌后抽 1）
-- [x] `battlefieldInterface` hook 待实现（不阻塞 Phase 3）
+- [x] `battlefieldInterface` hook：换位免费 + 下一张牌 -1 费（已补回归）
 
 ---
 
@@ -138,6 +135,8 @@
 - [x] 战斗胜利：3 选 1 卡牌 + 金币 + 药水概率
 - [x] 精英胜利：3 选 1 卡 + 2 选 1 植入体
 - [x] Boss 胜利：稀有/传奇植入体 + 稀有卡牌
+- [x] 奖励流转修复：金币只发一次；Act 1/2 Boss 先进奖励页，领奖后推进下一幕；选牌后不自动吞掉其他奖励
+- [x] 预知模块交互：偶数回合窥视抽牌堆顶 2 张，选择 1 张置顶
 
 ### 3.6 存档系统 ✅
 
@@ -146,10 +145,10 @@
 
 ### 3.7 待验证（Phase 3 剩余工作）
 
-- [ ] 场景间串联端到端测试（地图 → 战斗 → 奖励 → 地图循环）
+- [ ] 场景间串联端到端测试（地图 → 战斗 → 奖励 → 地图循环；核心层 Act 烟雾测试已补，仍需 Godot 实机/场景级验证）
 - [ ] Godot 编辑器首次运行调试（F5 实机验证）
 - [ ] 实际游戏平衡性体验（数值是否需要调整）
-- [ ] battlefieldInterface 植入体运行时 hook 实现
+- [x] battlefieldInterface 植入体运行时 hook 实现
 
 **Phase 3 完成标准：** 可以完整打一个 Act（15~20 个节点），有运气体验，有"这次 run 没拿到想要的牌"的感受。
 
@@ -191,7 +190,7 @@
 |------|------|------|
 | `OnDamageDealt` / `OnBlockGained` 事件未使用 | `CombatManager.cs` | 留给 UI 层用，暂时 warning 可接受 |
 | `DeckManager.DrawCardCallback` 残留 | `CardEffectContext` | fallback 用途，不影响正确性 |
-| `ScryEffect` 简化为抽牌 | `CardEffect.cs` | 需要 modal UI 才能实现完整版 |
+| 普通 `ScryEffect` 简化为抽牌 | `CardEffect.cs` | 预知模块已接 UI，卡牌通用 Scry 待后续统一 |
 | `LifestealEffect` 估算不准 | `CardEffect.cs` | Phase 1 修复，需要 context 回写伤害量 |
 | 美术全是占位 SVG | `assets/` | Phase 4 再处理 |
 | 音频全是静音 WAV | `assets/audio/` | Phase 4 再处理 |

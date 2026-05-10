@@ -41,6 +41,7 @@ public class RunState
     public ActMap? CurrentMap { get; set; }
     public int CurrentAct { get; set; } = 1;
     public int FloorsCleared { get; set; }
+    public int LastCombatGoldReward { get; private set; }
 
     // Databases
     public CardDatabase CardDb { get; } = new();
@@ -216,6 +217,7 @@ public class RunState
         int goldReward = wasBoss ? gb.BossGoldReward
             : wasElite ? gb.EliteGoldReward
             : Random.Next(gb.NormalGoldRewardMin, gb.NormalGoldRewardMax);
+        LastCombatGoldReward = goldReward;
         AddGold(goldReward);
 
         // Potion drop chance
@@ -352,6 +354,7 @@ public class RunState
             PlayerDrawPerTurn = Player.DrawPerTurn,
             PlayerClassResourceName = Player.ClassResourceName,
             Gold = Gold,
+            LastCombatGoldReward = LastCombatGoldReward,
             CurrentAct = CurrentAct,
             FloorsCleared = FloorsCleared,
             IsRunActive = IsRunActive,
@@ -464,6 +467,7 @@ public class RunState
         Player.ClassResourceName = data.PlayerClassResourceName ?? string.Empty;
 
         Gold = data.Gold;
+        LastCombatGoldReward = data.LastCombatGoldReward;
         CurrentAct = data.CurrentAct;
         FloorsCleared = data.FloorsCleared;
         IsRunActive = data.IsRunActive;
@@ -540,6 +544,7 @@ public sealed class RunStateSaveData
     public int PlayerDrawPerTurn { get; set; }
     public string? PlayerClassResourceName { get; set; }
     public int Gold { get; set; }
+    public int LastCombatGoldReward { get; set; }
     public int CurrentAct { get; set; }
     public int FloorsCleared { get; set; }
     public bool IsRunActive { get; set; }

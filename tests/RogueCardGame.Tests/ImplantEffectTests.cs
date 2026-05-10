@@ -165,6 +165,74 @@ public class ImplantEffectTests
         Assert.Equal(27, target.CurrentHp);
     }
 
+    [Fact]
+    public void BattlefieldInterface_should_make_row_switch_free_and_discount_next_card()
+    {
+        var player = PlayerCharacter.CreateVanguard("Vanguard");
+        var enemy = CreateEnemy("Enemy", 40);
+        var firstCard = CreateCard("first_skill");
+        var secondCard = CreateCard("second_skill");
+        var implants = CreateImplantManager(
+            CreateImplant(ImplantSlot.Neural, "battlefield_interface", ("battlefieldInterface", 1)));
+
+        var combat = new CombatManager(404);
+        combat.Initialize([player], [enemy], new Dictionary<int, List<Card>>
+        {
+            [player.Id] = [firstCard, secondCard]
+        }, implants: implants);
+        combat.StartCombat();
+
+        int energyBeforeSwitch = player.CurrentEnergy;
+        Assert.True(combat.TrySwitchRow(player));
+        Assert.Equal(energyBeforeSwitch, player.CurrentEnergy);
+
+        var hand = combat.PlayerDecks[player.Id].Hand;
+        Assert.True(combat.TryPlayCard(player, hand.First(c => c.Data.Id == "first_skill")));
+        Assert.Equal(energyBeforeSwitch, player.CurrentEnergy);
+
+        Assert.True(combat.TryPlayCard(player, hand.First(c => c.Data.Id == "second_skill")));
+        Assert.Equal(energyBeforeSwitch - 1, player.CurrentEnergy);
+    }
+
+    [Fact]
+    public void PrecognitionModule_should_trigger_scry_on_even_player_turn_and_reorder_draw_pile()
+    {
+        var player = PlayerCharacter.CreatePsion("Psion");
+        var enemy = CreateEnemy("Enemy", 40);
+        var deckCards = Enumerable.Range(0, 12).Select(i => CreateCard($"card_{i}")).ToList();
+        var implants = CreateImplantManager(
+            CreateImplant(ImplantSlot.Neural, "precognition_module", ("precognitionModule", 1)));
+
+        var combat = new CombatManager(818);
+        combat.Initialize([player], [enemy], new Dictionary<int, List<Card>>
+        {
+            [player.Id] = deckCards
+        }, implants: implants);
+
+        Card? chosen = null;
+        int triggerCount = 0;
+        combat.OnScryTriggered += (actor, deck, peeked, keepCount) =>
+        {
+            triggerCount++;
+            Assert.Equal(player, actor);
+            Assert.Equal(1, keepCount);
+            Assert.Equal(2, peeked.Count);
+            chosen = peeked[1];
+            combat.CompleteScry(actor, deck, peeked, chosen);
+        };
+
+        combat.StartCombat();
+        Assert.Equal(0, triggerCount);
+
+        combat.EndPlayerTurn();
+
+        Assert.Equal(1, triggerCount);
+        Assert.NotNull(chosen);
+
+        var drawn = combat.PlayerDecks[player.Id].Draw(1);
+        Assert.Same(chosen, Assert.Single(drawn));
+    }
+
     private static CardEffectContext CreateContext(
         Combatant source,
         Combatant target,
@@ -200,12 +268,20 @@ public class ImplantEffectTests
 
     private static ImplantData CreateCoreImplant(string id, params (string type, int value)[] effects)
     {
+        return CreateImplant(ImplantSlot.Core, id, effects);
+    }
+
+    private static ImplantData CreateImplant(
+        ImplantSlot slot,
+        string id,
+        params (string type, int value)[] effects)
+    {
         return new ImplantData
         {
             Id = id,
             Name = id,
             Description = id,
-            Slot = ImplantSlot.Core,
+            Slot = slot,
             Rarity = ImplantRarity.Rare,
             Effects = effects.Select(effect => new ImplantEffectData
             {

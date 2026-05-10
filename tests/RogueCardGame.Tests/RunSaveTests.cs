@@ -70,6 +70,24 @@ public class RunSaveTests
     }
 
     [Fact]
+    public void RunState_should_record_and_persist_last_combat_gold_reward()
+    {
+        var run = new RunState(5150, CardClass.Vanguard, DataDirectory);
+        run.StartRun(DataDirectory);
+
+        int goldBefore = run.Gold;
+        run.OnCombatVictory(wasElite: false, wasBoss: false);
+
+        var gb = BalanceConfig.Current.GlobalBalance;
+        Assert.InRange(run.LastCombatGoldReward, gb.NormalGoldRewardMin, gb.NormalGoldRewardMax - 1);
+        Assert.Equal(goldBefore + run.LastCombatGoldReward, run.Gold);
+
+        var loaded = RunState.Deserialize(run.Serialize(), DataDirectory);
+        Assert.Equal(run.LastCombatGoldReward, loaded.LastCombatGoldReward);
+        Assert.Equal(run.Gold, loaded.Gold);
+    }
+
+    [Fact]
     public void SaveManager_should_persist_and_reload_active_run_payload()
     {
         string saveDir = Path.Combine(Path.GetTempPath(), $"roguecardgame-tests-{Guid.NewGuid():N}");

@@ -1,4 +1,5 @@
 using Godot;
+using System.IO;
 using RogueCardGame.Core.Cards;
 
 namespace RogueCardGame;
@@ -67,6 +68,11 @@ public static class CyberCardFactory
     }
 
     private static readonly Dictionary<string, Texture2D> TextureCache = new();
+
+    public static void ClearTextureCache()
+    {
+        TextureCache.Clear();
+    }
 
     public static CardVisual CreateGameplayCard(
         Card card,
@@ -356,6 +362,47 @@ public static class CyberCardFactory
         }
         else if (useNeutralCompactStyle)
         {
+            var portraitPath = GetClassPortraitPath(cardData.Class);
+            if (portraitPath.Length > 0)
+            {
+                var portraitTexture = LoadTexture(portraitPath);
+                if (portraitTexture != null)
+                {
+                    var portrait = new TextureRect
+                    {
+                        Texture = portraitTexture,
+                        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                        StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
+                        Modulate = new Color(1f, 1f, 1f, dimmed ? 0.06f : 0.18f),
+                        MouseFilter = Control.MouseFilterEnum.Ignore
+                    };
+                    portrait.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+                    portrait.AnchorLeft = 0.04f;
+                    portrait.AnchorTop = -0.06f;
+                    portrait.AnchorRight = 1.04f;
+                    portrait.AnchorBottom = 1.08f;
+                    artStage.AddChild(portrait);
+                }
+            }
+
+            var artTexture = LoadTexture(GetCardArtPath(cardData));
+            if (artTexture != null)
+            {
+                var art = new TextureRect
+                {
+                    Texture = artTexture,
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                    Modulate = new Color(1f, 1f, 1f, dimmed ? 0.08f : 0.22f),
+                    MouseFilter = Control.MouseFilterEnum.Ignore
+                };
+                art.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+                art.AnchorLeft = 0.02f;
+                art.AnchorTop = -0.02f;
+                art.AnchorRight = 1.02f;
+                art.AnchorBottom = 1.03f;
+                artStage.AddChild(art);
+            }
         }
         else
         {
@@ -1413,10 +1460,10 @@ public static class CyberCardFactory
 
     public static string GetClassPortraitPath(CardClass cardClass) => cardClass switch
     {
-        CardClass.Vanguard => "res://resources/textures/characters/vanguard.svg",
-        CardClass.Psion => "res://resources/textures/characters/psion.svg",
-        CardClass.Netrunner => "res://resources/textures/characters/netrunner.svg",
-        CardClass.Symbiote => "res://resources/textures/characters/symbiote.svg",
+        CardClass.Vanguard => "res://resources/textures/characters/vanguard.png",
+        CardClass.Psion => "res://resources/textures/characters/psion.png",
+        CardClass.Netrunner => "res://resources/textures/characters/netrunner.png",
+        CardClass.Symbiote => "res://resources/textures/characters/symbiote.png",
         _ => string.Empty
     };
 
@@ -1647,10 +1694,27 @@ public static class CyberCardFactory
         if (TextureCache.TryGetValue(path, out var cached))
             return cached;
 
-        var texture = GD.Load<Texture2D>(path);
+        var texture = LoadRasterTextureFromFile(path) ?? GD.Load<Texture2D>(path);
         if (texture != null)
             TextureCache[path] = texture;
         return texture;
+    }
+
+    private static Texture2D? LoadRasterTextureFromFile(string path)
+    {
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext is not (".png" or ".jpg" or ".jpeg" or ".webp"))
+            return null;
+
+        string filePath = ProjectSettings.GlobalizePath(path);
+        if (!File.Exists(filePath))
+            return null;
+
+        var image = Image.LoadFromFile(filePath);
+        if (image == null || image.IsEmpty())
+            return null;
+
+        return ImageTexture.CreateFromImage(image);
     }
 
     private static IEnumerable<string> BuildArtCandidates(CardData cardData)

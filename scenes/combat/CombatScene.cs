@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using RogueCardGame.Core.Cards;
 using RogueCardGame.Core.Characters;
@@ -14,6 +15,8 @@ public partial class CombatScene : Control
 {
 	// --- Scene tree nodes ---
 	private HBoxContainer _enemyArea = null!;
+	private HBoxContainer _enemyFrontLane = null!;
+	private HBoxContainer _enemyBackLane = null!;
 	private Control _handArea = null!;
 	private Button _endTurnBtn = null!;
 	private Button _switchRowBtn = null!;
@@ -28,6 +31,8 @@ public partial class CombatScene : Control
 	private Label _turnLabel = null!;
 
 	// --- Player character display ---
+	private ColorRect _playerPortraitGlow = null!;
+	private ColorRect _playerPortraitScan = null!;
 	private TextureRect _playerSprite = null!;
 	private ProgressBar _hpBarDynamic = null!;
 	private Label _hpTextDynamic = null!;
@@ -94,6 +99,13 @@ public partial class CombatScene : Control
 	private Color _hoveredCardBaseBorderColor = Colors.Transparent;
 	private Color _hoveredCardBaseShadowColor = Colors.Transparent;
 	private float _idleTime;
+	private readonly List<Texture2D> _playerPortraitIdleFrames = [];
+	private readonly List<Texture2D> _playerPortraitActionFrames = [];
+	private float _playerPortraitIdleTime;
+	private int _playerPortraitIdleFrame = -1;
+	private float _playerPortraitActionTime;
+	private int _playerPortraitActionFrame = -1;
+	private bool _playerPortraitActionPlaying;
 
 	// --- Card fan constants ---
 	private const float CardWidth = 120f;
@@ -109,6 +121,8 @@ public partial class CombatScene : Control
 	private const float CardHitboxWidth = CardWidth + HoverSidePadding * 2f;
 	private const float CardHitboxHeight = CardHeight + HoverLift + HoverTopPadding;
 	private const float MinDenseHandSpacingRatio = 0.72f;
+	private const float PlayerPortraitIdleFps = 25f;
+	private const float PlayerPortraitActionFps = 25f;
 	private static readonly bool DebugRenderLayers = false;
 	private static readonly bool DebugHandRenderDump = false;
 	private int _handRenderDumpSequence;
@@ -116,22 +130,82 @@ public partial class CombatScene : Control
 	// --- Texture cache ---
 	private static readonly Dictionary<string, Texture2D> _textureCache = new();
 
+	public static void ClearTextureCache()
+	{
+		_textureCache.Clear();
+	}
+
 	private static Texture2D LoadTex(string resPath)
 	{
 		if (_textureCache.TryGetValue(resPath, out var cached)) return cached;
-		var tex = GD.Load<Texture2D>(resPath);
+		var tex = LoadRasterTextureFromFile(resPath) ?? GD.Load<Texture2D>(resPath);
 		if (tex != null) _textureCache[resPath] = tex;
 		return tex!;
 	}
 
+	private static Texture2D? LoadRasterTextureFromFile(string path)
+	{
+		string ext = Path.GetExtension(path).ToLowerInvariant();
+		if (ext is not (".png" or ".jpg" or ".jpeg" or ".webp"))
+			return null;
+
+		string filePath = ProjectSettings.GlobalizePath(path);
+		if (!File.Exists(filePath))
+			return null;
+
+		var image = Image.LoadFromFile(filePath);
+		if (image == null || image.IsEmpty())
+			return null;
+
+		return ImageTexture.CreateFromImage(image);
+	}
+
 	private static string GetCharacterTexturePath(CardClass cls) => cls switch
 	{
-		CardClass.Vanguard => "res://resources/textures/characters/vanguard.svg",
-		CardClass.Psion => "res://resources/textures/characters/psion.svg",
-		CardClass.Netrunner => "res://resources/textures/characters/netrunner.svg",
-		CardClass.Symbiote => "res://resources/textures/characters/symbiote.svg",
-		_ => "res://resources/textures/characters/vanguard.svg"
+		CardClass.Vanguard => "res://resources/textures/characters/vanguard.png",
+		CardClass.Psion => "res://resources/textures/characters/psion.png",
+		CardClass.Netrunner => "res://resources/textures/characters/netrunner.png",
+		CardClass.Symbiote => "res://resources/textures/characters/symbiote.png",
+		_ => "res://resources/textures/characters/vanguard.png"
 	};
+
+	private static string GetCharacterAnimationClassDir(CardClass cls) => cls switch
+	{
+		CardClass.Vanguard => "vanguard",
+		CardClass.Psion => "psion",
+		CardClass.Netrunner => "netrunner",
+		CardClass.Symbiote => "symbiote",
+		_ => string.Empty
+	};
+
+	private static string GetCharacterAnimationDir(CardClass cls, string animation)
+	{
+		string classDir = GetCharacterAnimationClassDir(cls);
+		return classDir.Length == 0 || string.IsNullOrWhiteSpace(animation)
+			? string.Empty
+			: $"res://resources/textures/characters/animations/{classDir}/{animation}";
+	}
+
+	private static string GetCharacterCombatIdleDir(CardClass cls) =>
+		GetCharacterAnimationDir(cls, "combat_idle");
+
+	private static string GetCharacterSpecialAnimationName(CardClass cls) => cls switch
+	{
+		CardClass.Vanguard => "overload",
+		CardClass.Psion => "resonance",
+		CardClass.Netrunner => "protocol_stack",
+		CardClass.Symbiote => "erosion",
+		_ => string.Empty
+	};
+
+	private static bool ResourceFileExists(string resPath)
+	{
+		if (string.IsNullOrWhiteSpace(resPath))
+			return false;
+
+		string filePath = ProjectSettings.GlobalizePath(resPath);
+		return File.Exists(filePath) || ResourceLoader.Exists(resPath);
+	}
 
 	private static string GetEnemyTexturePath(Enemy enemy)
 	{
@@ -400,9 +474,30 @@ public partial class CombatScene : Control
 	// ======================================================================
 	private void BuildPlayerCharacter()
 	{
+		_playerPortraitGlow = new ColorRect
+		{
+			Color = new Color(0f, 0f, 0f, 0f),
+			MouseFilter = MouseFilterEnum.Ignore
+		};
+		_playerPortraitGlow.SetAnchorsPreset(LayoutPreset.FullRect);
+		_playerPortraitGlow.AnchorLeft = 0.055f; _playerPortraitGlow.AnchorRight = 0.225f;
+		_playerPortraitGlow.AnchorTop = 0.075f; _playerPortraitGlow.AnchorBottom = 0.525f;
+		AddChild(_playerPortraitGlow);
+
+		_playerPortraitScan = new ColorRect
+		{
+			Color = new Color(1f, 1f, 1f, 0.08f),
+			MouseFilter = MouseFilterEnum.Ignore
+		};
+		_playerPortraitScan.SetAnchorsPreset(LayoutPreset.FullRect);
+		_playerPortraitScan.AnchorLeft = 0.06f; _playerPortraitScan.AnchorRight = 0.22f;
+		_playerPortraitScan.AnchorTop = 0.08f; _playerPortraitScan.AnchorBottom = 0.083f;
+		AddChild(_playerPortraitScan);
+
 		// Player sprite - left side of battlefield
 		_playerSprite = new TextureRect
 		{
+			Name = "PlayerPortrait",
 			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
 			StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
 			MouseFilter = MouseFilterEnum.Ignore,
@@ -411,6 +506,7 @@ public partial class CombatScene : Control
 		_playerSprite.AnchorLeft = 0.06f; _playerSprite.AnchorRight = 0.22f;
 		_playerSprite.AnchorTop = 0.08f; _playerSprite.AnchorBottom = 0.52f;
 		AddChild(_playerSprite);
+		MoveChild(_playerPortraitScan, _playerSprite.GetIndex() + 1);
 
 		// HP bar directly under player sprite
 		var hpPanel = new PanelContainer();
@@ -557,9 +653,13 @@ public partial class CombatScene : Control
 		// Player sprite idle breathing
 		if (_playerSprite != null && _player != null && _player.IsAlive)
 		{
+			if (!UpdatePlayerPortraitAction(delta))
+				UpdatePlayerPortraitIdle(delta);
+
 			float pp = _idleTime * 1.0f;
 			float pb = 1f + 0.008f * MathF.Sin(pp);
 			_playerSprite.Scale = new Vector2(pb, pb);
+			UpdatePlayerPortraitFx(pp);
 		}
 
 		// Energy orb pulse
@@ -568,6 +668,11 @@ public partial class CombatScene : Control
 			float pulse = 1f + 0.02f * MathF.Sin(_idleTime * 2.5f);
 			_energyOrb.Scale = new Vector2(pulse, pulse);
 		}
+	}
+
+	public override void _ExitTree()
+	{
+		ReleasePlayerPortraitFrames();
 	}
 
 	// ======================================================================
@@ -1333,8 +1438,8 @@ public partial class CombatScene : Control
 		_combatResult = null;
 		_combat.StartCombat();
 
-		// Set player character sprite
-		_playerSprite.Texture = LoadTex(GetCharacterTexturePath(_player.Class));
+		// Set player character sprite / combat idle loop.
+		SetPlayerPortrait(_player.Class);
 
 		var currentNode = run.CurrentMap?.CurrentNode;
 		bool isBoss = currentNode?.Type == RoomType.Boss;
@@ -1350,32 +1455,276 @@ public partial class CombatScene : Control
 	// ======================================================================
 	private void BuildEnemyPanels()
 	{
-		foreach (var child in _enemyArea.GetChildren()) child.QueueFree();
+		ClearEnemyArea();
+		BuildEnemyLaneBoard();
 		_enemyPanels.Clear();
 		if (_combat == null) return;
 		foreach (var enemy in _combat.Enemies)
 		{
-			var panel = new EnemyPanel(enemy);
-			_enemyArea.AddChild(panel.Root);
+			var panel = CreateEnemyPanel(enemy);
 			_enemyPanels.Add(panel);
-			panel.ClickArea.GuiInput += (ev) =>
-			{
-				if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-					OnEnemyClicked(enemy);
-			};
+			MovePanelToCurrentLane(panel);
 		}
+	}
+
+	private void UpdatePlayerPortraitFx(float phase)
+	{
+		if (_player == null || _playerPortraitGlow == null || _playerPortraitScan == null)
+			return;
+
+		var accent = CyberCardFactory.GetClassAccent(_player.Class);
+		float pulse = 0.09f + 0.05f * (0.5f + 0.5f * MathF.Sin(phase * 1.6f));
+		_playerPortraitGlow.Color = new Color(accent.R, accent.G, accent.B, pulse);
+
+		float scanT = 0.5f + 0.5f * MathF.Sin(phase * 0.85f);
+		float top = Mathf.Lerp(0.095f, 0.49f, scanT);
+		_playerPortraitScan.AnchorTop = top;
+		_playerPortraitScan.AnchorBottom = top + 0.006f;
+		_playerPortraitScan.Color = new Color(
+			Mathf.Lerp(accent.R, 1f, 0.35f),
+			Mathf.Lerp(accent.G, 1f, 0.35f),
+			Mathf.Lerp(accent.B, 1f, 0.35f),
+			0.08f + pulse * 0.5f);
+	}
+
+	private void SetPlayerPortrait(CardClass cls)
+	{
+		ReleasePlayerPortraitFrames();
+
+		LoadPlayerPortraitFrames(cls, "combat_idle", _playerPortraitIdleFrames);
+		if (_playerPortraitIdleFrames.Count > 0)
+		{
+			_playerPortraitIdleFrame = 0;
+			_playerSprite.Texture = _playerPortraitIdleFrames[0];
+			return;
+		}
+
+		_playerSprite.Texture = LoadTex(GetCharacterTexturePath(cls));
+	}
+
+	private void ReleasePlayerPortraitFrames()
+	{
+		if (_playerSprite != null)
+			_playerSprite.Texture = null;
+
+		_playerPortraitIdleFrames.Clear();
+		_playerPortraitActionFrames.Clear();
+		_playerPortraitIdleTime = 0f;
+		_playerPortraitIdleFrame = -1;
+		_playerPortraitActionTime = 0f;
+		_playerPortraitActionFrame = -1;
+		_playerPortraitActionPlaying = false;
+	}
+
+	private void LoadPlayerPortraitFrames(CardClass cls, string animation, List<Texture2D> target)
+	{
+		target.Clear();
+		string dir = GetCharacterAnimationDir(cls, animation);
+		if (dir.Length == 0)
+			return;
+
+		for (int i = 0; i < 64; i++)
+		{
+			string framePath = $"{dir}/frame_{i:00}.png";
+			if (!ResourceFileExists(framePath))
+				break;
+
+			var frame = LoadTex(framePath);
+			if (frame != null)
+				target.Add(frame);
+		}
+	}
+
+	private void PlayPlayerPortraitAction(string animation)
+	{
+		if (_player == null || _playerSprite == null || string.IsNullOrWhiteSpace(animation))
+			return;
+
+		LoadPlayerPortraitFrames(_player.Class, animation, _playerPortraitActionFrames);
+		if (_playerPortraitActionFrames.Count == 0)
+			return;
+
+		_playerPortraitActionTime = 0f;
+		_playerPortraitActionFrame = 0;
+		_playerPortraitActionPlaying = true;
+		_playerSprite.Texture = _playerPortraitActionFrames[0];
+	}
+
+	private bool UpdatePlayerPortraitAction(double delta)
+	{
+		if (!_playerPortraitActionPlaying || _playerPortraitActionFrames.Count == 0)
+			return false;
+
+		_playerPortraitActionTime += (float)delta;
+		int frame = (int)(_playerPortraitActionTime * PlayerPortraitActionFps);
+		if (frame >= _playerPortraitActionFrames.Count)
+		{
+			_playerPortraitActionFrames.Clear();
+			_playerPortraitActionFrame = -1;
+			_playerPortraitActionPlaying = false;
+			UpdatePlayerPortraitIdle(0);
+			return false;
+		}
+
+		if (frame != _playerPortraitActionFrame)
+		{
+			_playerPortraitActionFrame = frame;
+			_playerSprite.Texture = _playerPortraitActionFrames[frame];
+		}
+
+		return true;
+	}
+
+	private void UpdatePlayerPortraitIdle(double delta)
+	{
+		if (_playerPortraitIdleFrames.Count <= 1)
+			return;
+
+		_playerPortraitIdleTime += (float)delta;
+		int frame = (int)(_playerPortraitIdleTime * PlayerPortraitIdleFps) % _playerPortraitIdleFrames.Count;
+		if (frame == _playerPortraitIdleFrame)
+			return;
+
+		_playerPortraitIdleFrame = frame;
+		_playerSprite.Texture = _playerPortraitIdleFrames[frame];
 	}
 
 	private void AddEnemyPanel(Enemy enemy)
 	{
-		var panel = new EnemyPanel(enemy);
-		_enemyArea.AddChild(panel.Root);
+		var panel = CreateEnemyPanel(enemy);
 		_enemyPanels.Add(panel);
+		MovePanelToCurrentLane(panel);
+	}
+
+	private EnemyPanel CreateEnemyPanel(Enemy enemy)
+	{
+		var panel = new EnemyPanel(enemy);
 		panel.ClickArea.GuiInput += (ev) =>
 		{
 			if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
 				OnEnemyClicked(enemy);
 		};
+		return panel;
+	}
+
+	private void ClearEnemyArea()
+	{
+		foreach (var child in _enemyArea.GetChildren())
+		{
+			_enemyArea.RemoveChild(child);
+			child.QueueFree();
+		}
+	}
+
+	private void BuildEnemyLaneBoard()
+	{
+		_enemyArea.Alignment = BoxContainer.AlignmentMode.Center;
+
+		var board = new VBoxContainer
+		{
+			Name = "EnemyLaneBoard",
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ExpandFill
+		};
+		board.AddThemeConstantOverride("separation", 6);
+
+		_enemyBackLane = CreateEnemyLane(board, "EnemyBackLaneBand", "EnemyBackLane", "\u540e\u6392", new Color(0.22f, 0.5f, 0.9f));
+
+		var divider = new ColorRect
+		{
+			Name = "EnemyLaneDivider",
+			Color = new Color(0.7f, 0.9f, 1f, 0.24f),
+			CustomMinimumSize = new Vector2(0, 2),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill
+		};
+		board.AddChild(divider);
+
+		_enemyFrontLane = CreateEnemyLane(board, "EnemyFrontLaneBand", "EnemyFrontLane", "\u524d\u6392", new Color(1f, 0.55f, 0.22f));
+		_enemyArea.AddChild(board);
+	}
+
+	private static HBoxContainer CreateEnemyLane(
+		VBoxContainer board,
+		string bandName,
+		string laneName,
+		string labelText,
+		Color accent)
+	{
+		var band = new PanelContainer
+		{
+			Name = bandName,
+			CustomMinimumSize = new Vector2(0, 138),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ExpandFill
+		};
+		band.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = new Color(0.025f, 0.04f, 0.065f, 0.72f),
+			BorderColor = new Color(accent.R, accent.G, accent.B, 0.55f),
+			BorderWidthLeft = 2,
+			BorderWidthRight = 1,
+			BorderWidthTop = 1,
+			BorderWidthBottom = 1,
+			CornerRadiusBottomLeft = 6,
+			CornerRadiusBottomRight = 6,
+			CornerRadiusTopLeft = 6,
+			CornerRadiusTopRight = 6,
+			ContentMarginLeft = 8,
+			ContentMarginRight = 8,
+			ContentMarginTop = 5,
+			ContentMarginBottom = 5
+		});
+
+		var row = new HBoxContainer
+		{
+			Name = $"{laneName}Row",
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ExpandFill
+		};
+		row.AddThemeConstantOverride("separation", 8);
+
+		var label = new Label
+		{
+			Name = $"{laneName}Label",
+			Text = labelText,
+			CustomMinimumSize = new Vector2(34, 0),
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart
+		};
+		label.AddThemeFontSizeOverride("font_size", 12);
+		label.AddThemeColorOverride("font_color", accent);
+		row.AddChild(label);
+
+		var lane = new HBoxContainer
+		{
+			Name = laneName,
+			Alignment = BoxContainer.AlignmentMode.Center,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ExpandFill
+		};
+		lane.AddThemeConstantOverride("separation", 12);
+		row.AddChild(lane);
+
+		band.AddChild(row);
+		board.AddChild(band);
+		return lane;
+	}
+
+	private HBoxContainer GetLaneForEnemy(Enemy enemy)
+	{
+		var row = _combat?.Formation.GetPosition(enemy.Id) ?? enemy.Data.PreferredRow;
+		return row == FormationRow.Front ? _enemyFrontLane : _enemyBackLane;
+	}
+
+	private void MovePanelToCurrentLane(EnemyPanel panel)
+	{
+		var lane = GetLaneForEnemy(panel.Enemy);
+		if (panel.Root.GetParent() == lane)
+			return;
+
+		panel.Root.GetParent()?.RemoveChild(panel.Root);
+		lane.AddChild(panel.Root);
 	}
 
 
@@ -1779,12 +2128,98 @@ public partial class CombatScene : Control
 		PlayCardAnimated(_selectedCard, enemy);
 	}
 
+	private string? GetPlayerPortraitActionForCard(Card card, int playerBlockBefore)
+	{
+		if (_player == null)
+			return null;
+
+		var row = _combat?.Formation.GetPosition(_player.Id) ?? _player.PreferredRow;
+		var effects = FlattenEffects(card.GetEffectsForRow(row)).ToList();
+
+		if (card.Data.Type == CardType.Attack)
+		{
+			if (effects.Any(IsClassResourceAnimationEffect))
+				return GetCharacterSpecialAnimationName(_player.Class);
+
+			return "attack";
+		}
+
+		if (_player.Block > playerBlockBefore || effects.Any(IsBlockAnimationEffect))
+			return "gain_armor";
+
+		if (card.Data.Type == CardType.Power || effects.Any(IsClassResourceAnimationEffect))
+			return GetCharacterSpecialAnimationName(_player.Class);
+
+		if (effects.Any(CardEffectFactory.EffectRequiresEnemyTarget))
+			return "attack";
+
+		return null;
+	}
+
+	private static IEnumerable<CardEffectData> FlattenEffects(IEnumerable<CardEffectData> effects)
+	{
+		foreach (var effect in effects)
+		{
+			yield return effect;
+			if (effect.FrontEffect != null)
+				yield return effect.FrontEffect;
+			if (effect.BackEffect != null)
+				yield return effect.BackEffect;
+		}
+	}
+
+	private static bool IsBlockAnimationEffect(CardEffectData effect)
+	{
+		string type = NormalizeEffectType(effect);
+		return type is "block"
+			or "armor"
+			or "conditionalblock"
+			or "blockperovercharge"
+			or "blockperresonance"
+			or "resonanceblock";
+	}
+
+	private static bool IsClassResourceAnimationEffect(CardEffectData effect)
+	{
+		string type = NormalizeEffectType(effect);
+		return type is "overchargeconsume"
+			or "consumeovercharge"
+			or "blockperovercharge"
+			or "resonancedamage"
+			or "resonanceblock"
+			or "consumeresonance"
+			or "resonanceamplify"
+			or "delayedresonance"
+			or "clearresonance"
+			or "halveresonance"
+			or "blockperresonance"
+			or "protocolstack"
+			or "consumeprotocol"
+			or "protocoldamage"
+			or "doubleprotocol"
+			or "hack"
+			or "hackonaction"
+			or "hackpercentofdamage"
+			or "instanthack"
+			or "selfdamage"
+			or "selfdamagepercent"
+			or "damagefromhplost"
+			or "lifesteal"
+			or "spreadpoison"
+			or "healperpoisondamage"
+			or "damageperpoisonedenemy";
+	}
+
+	private static string NormalizeEffectType(CardEffectData effect) =>
+		(effect.Type ?? string.Empty).Trim().ToLowerInvariant();
+
 	private async void PlayCardAnimated(Card card, Enemy? target)
 	{
 		if (_combat == null || _player == null) return;
 		_inputLocked = true;
 
 		var hpBefore = _enemyPanels.ToDictionary(ep => ep.Enemy, ep => ep.Enemy.CurrentHp);
+		int playerBlockBefore = _player.Block;
 
 		Vector2 cardPos = new Vector2(Size.X / 2, Size.Y * 0.78f);
 		Vector2 cardSz = new Vector2(CardWidth, CardHeight);
@@ -1826,6 +2261,10 @@ public partial class CombatScene : Control
 		}
 
 		HideSelectionHint();
+
+		string? portraitAction = GetPlayerPortraitActionForCard(card, playerBlockBefore);
+		if (portraitAction != null)
+			PlayPlayerPortraitAction(portraitAction);
 
 		AudioManager.Instance?.PlaySfx(AudioManager.SfxPaths.CardPlay);
 
@@ -2380,7 +2819,11 @@ public partial class CombatScene : Control
 	private void RefreshEnemies()
 	{
 		if (_combat == null) return;
-		foreach (var p in _enemyPanels) p.Update(_combat.Formation);
+		foreach (var p in _enemyPanels)
+		{
+			MovePanelToCurrentLane(p);
+			p.Update(_combat.Formation);
+		}
 	}
 
 	private void RefreshDeckInfo()

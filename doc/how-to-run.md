@@ -11,7 +11,7 @@
 
 ```powershell
 # 在项目根目录打开 Godot 编辑器
-.\gdot\Godot_v4.6.2-stable_win64.exe --path .
+.\gdot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64.exe --path .
 ```
 
 编辑器打开后：
@@ -26,7 +26,7 @@
 dotnet build
 
 # 直接运行主场景
-.\gdot\Godot_v4.6.2-stable_win64.exe --path . --run
+.\gdot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64.exe --path . --run
 ```
 
 > ⚠️ 首次运行建议使用方法一，让 Godot 先导入所有资源（SVG、WAV 等）。
@@ -34,17 +34,36 @@ dotnet build
 ### 方法三：使用控制台版本（显示日志输出）
 
 ```powershell
-.\gdot\Godot_v4.6.2-stable_win64_console.exe --path . --run
+.\gdot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64_console.exe --path . --run
 ```
 
 控制台版本会在终端中显示 `GD.Print()` 输出和错误信息，方便调试。
+
+## 自动验收
+
+```powershell
+# 核心层与回归测试
+dotnet test
+
+# Phase 3 UI 场景加载 smoke：主菜单/地图/战斗/奖励/商店/事件/休息
+.\gdot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64_console.exe --headless --path . --scene res://scenes/testing/Phase3UiSmoke.tscn
+
+# Phase 3 场景流转 smoke：地图 → 战斗 → 奖励 → 地图
+.\gdot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64_console.exe --headless --path . --scene res://scenes/testing/Phase3FlowSmoke.tscn
+
+# Phase 3 分支交互 smoke：奖励/商店/事件/休息点击行为
+.\gdot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64_console.exe --headless --path . --scene res://scenes/testing/Phase3InteractionSmoke.tscn
+
+# Phase 3 完整 Act smoke：Act 1 连续路线 → Boss → Act 2
+.\gdot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64_console.exe --headless --path . --scene res://scenes/testing/Phase3ActSmoke.tscn
+```
 
 ## 项目结构概览
 
 ```
 RogueCardGame/
 ├── project.godot          # Godot 项目配置（入口场景、自动加载等）
-├── RogueCardGame.csproj   # C# 项目文件（Godot.NET.Sdk 4.3.0）
+├── RogueCardGame.csproj   # C# 项目文件（Godot.NET.Sdk 4.6.2）
 ├── global.json            # .NET SDK 版本锁定
 │
 ├── scenes/                # Godot 场景文件 (.tscn + .cs)

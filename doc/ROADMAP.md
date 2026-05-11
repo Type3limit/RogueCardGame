@@ -8,7 +8,7 @@
 
 ## 当前状态快照
 
-> 最后更新：2026-05-10 | Build: 0 error, tests warning only | Test: **52/52 pass** | Phase 3 奖励流转、Scry 交互、Act核心烟雾测试修复中
+> 最后更新：2026-05-10 | Build: 0 error, tests warning only | Test: **54/54 pass** | UI Smoke: **124 checks pass** | Flow Smoke: **19 checks pass** | Interaction Smoke: **24 checks pass** | Act Smoke: **120 checks pass** | Phase 4 日系二次元美术资源替换已开始
 
 ### 已完成的核心系统
 
@@ -34,8 +34,8 @@
 | 地图系统 | `MapSystem.cs` / `MapScene.cs` | ✅ 分叉路径，节点着色，路由 |
 | 商店系统 | `ShopSystem.cs` / `ShopScene.cs` | ✅ 买卡/植入体/药水/移除 |
 | 奖励系统 | `RewardScene.cs` | ✅ 3选1卡/精英植入体/Boss稀有 |
-| UI / 场景层 | 场景脚本 | ✅ 骨架完整，待 Godot 实机调试 |
-| 美术 / 音频 | — | ❌ 全是占位资源 |
+| UI / 场景层 | 场景脚本 + smoke runners | ✅ 骨架完整；Godot headless 已覆盖场景加载、地图→战斗→奖励→地图流转、分支交互 |
+| 美术 / 音频 | — | 🟡 四职业日系二次元主立绘已替换；卡牌独立插画与音频仍占位 |
 
 ### 已知问题
 
@@ -43,7 +43,7 @@
 |------|------|--------|
 | `LifestealEffect` 治疗量估算不准 | `CardEffect.cs` | 低优先级 |
 | P5 残留：带行为的 core implant 仍硬编码在 `CombatManager` 条件块 | `CombatManager.cs` | 见核心层重构规划 §5 |
-| 美术/音频全占位 | `resources/` | Phase 4 |
+| 美术/音频全占位 | `resources/` | Phase 4：日系二次元角色主立绘已开始替换 |
 
 ### 核心层重构（2026-04-17）
 
@@ -145,8 +145,11 @@
 
 ### 3.7 待验证（Phase 3 剩余工作）
 
-- [ ] 场景间串联端到端测试（地图 → 战斗 → 奖励 → 地图循环；核心层 Act 烟雾测试已补，仍需 Godot 实机/场景级验证）
-- [ ] Godot 编辑器首次运行调试（F5 实机验证）
+- [x] Godot 场景级 UI smoke：主菜单 / 地图 / 战斗 / 奖励 / 商店 / 事件 / 休息加载与动态内容渲染（36 checks，headless 通过）
+- [x] 场景间串联 smoke：地图按钮 → 战斗自动出牌胜利 → 奖励页 → 返回地图（19 checks，headless 通过）
+- [x] 分支交互 smoke：奖励选牌 / 商店买卡 / 事件选择 / 休息升级 / 休息治疗（24 checks，headless 通过）
+- [x] 完整 Act smoke：Act 1 连续路线 → 自动战斗 → 事件/休息/奖励处理 → Boss → Act 2（120 checks，headless 通过；runner 使用固定测试补给稳定自动玩家）
+- [ ] Godot 编辑器首次运行调试（F5 实机可视化验证）
 - [ ] 实际游戏平衡性体验（数值是否需要调整）
 - [x] battlefieldInterface 植入体运行时 hook 实现
 
@@ -158,11 +161,23 @@
 
 **目标：站位系统成为真正的核心差异点，不是其他卡牌游戏有的系统加了个站位而已。**
 
+### 4.0 角色主视觉与卡面美术
+
+- [x] 四职业主立绘首批替换：先锋 / 灵能者 / 黑客 / 共生体均接入日系二次元 PNG 立绘
+- [x] 职业选择页与战斗场景改用新立绘资源
+- [x] 战斗内动态立绘基础：职业色脉冲 + 扫描线 + 呼吸缩放
+- [x] 四职业战斗待机动态立绘：25fps / 1 秒循环，透明 PNG 帧序列，朝右面向敌人，战斗中自动循环播放
+- [x] 紧凑卡面加入职业人物底图与卡牌插画层，避免手牌只剩文字/符号
+- [x] 四职业战斗动作扩展：攻击 / 增加护甲 / 职业特殊增益动画各 25 帧透明 PNG；玩家出攻击牌、加甲牌、职业核心/能力牌时自动切换播放
+- [ ] 每张卡独立插画批量替换：按卡牌机制生成/接入独立 artPath PNG/WebP
+- [ ] 敌人与 Boss 立绘替换
+
 ### 4.1 站位系统深化
 
-- [ ] **敌人也有站位**：部分近战敌人必须打前排目标，逼玩家决策"我要不要去前排硬扛"
-- [ ] **阵型联动**：多个敌人时，"把某个敌人推到后排 → 它无法攻击 → 消耗一回合"变成可行策略
-- [ ] **位置改变的反馈**：UI 上前/后排分界线要非常清晰，换位动画要有感
+- [x] **敌人也有站位**：敌人 `preferredRow` 进入战斗初始化；近战目标选择不能越过前排敌人
+- [x] **阵型联动基础闭环**：`冲击弹` 可将目标推入后排；前排近战敌被推到后排后敌方回合失能一次（核心测试覆盖）
+- [x] **位置改变的基础反馈**：Combat UI 将敌人分入前/后排 lane，UI smoke 检查 lane 渲染
+- [ ] **位置改变的动画反馈**：推位/换位动画与命中节奏强化
 
 ### 4.2 连击感 / 节奏感
 
@@ -192,7 +207,7 @@
 | `DeckManager.DrawCardCallback` 残留 | `CardEffectContext` | fallback 用途，不影响正确性 |
 | 普通 `ScryEffect` 简化为抽牌 | `CardEffect.cs` | 预知模块已接 UI，卡牌通用 Scry 待后续统一 |
 | `LifestealEffect` 估算不准 | `CardEffect.cs` | Phase 1 修复，需要 context 回写伤害量 |
-| 美术全是占位 SVG | `assets/` | Phase 4 再处理 |
+| 美术全是占位 SVG | `resources/textures/` | 四职业日系二次元主立绘已替换；卡牌独立图、敌人、背景仍待处理 |
 | 音频全是静音 WAV | `assets/audio/` | Phase 4 再处理 |
 
 ---

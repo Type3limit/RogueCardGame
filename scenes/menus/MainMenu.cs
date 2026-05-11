@@ -298,16 +298,16 @@ public partial class MainMenu : Control
 		{
 			CreateClassCard("先锋", "VANGUARD", "重装战士，擅长前排近战与护甲叠加。",
 				CardClass.Vanguard, new Color(0.9f, 0.22f, 0.27f), 85, 3, 5, "超载 Overcharge",
-				"res://resources/textures/characters/vanguard.svg");
+				CyberCardFactory.GetClassPortraitPath(CardClass.Vanguard));
 			CreateClassCard("灵能者", "PSION", "远程念力输出者，掌控战场节奏。",
 				CardClass.Psion, new Color(0.66f, 0.33f, 0.97f), 65, 3, 5, "共鸣 Resonance",
-				"res://resources/textures/characters/psion.svg");
+				CyberCardFactory.GetClassPortraitPath(CardClass.Psion));
 			CreateClassCard("黑客", "NETRUNNER", "数据控制大师，操控信息之流。",
 				CardClass.Netrunner, new Color(0.02f, 0.71f, 0.83f), 70, 3, 5, "协议栈 Protocols",
-				"res://resources/textures/characters/netrunner.svg");
+				CyberCardFactory.GetClassPortraitPath(CardClass.Netrunner));
 			CreateClassCard("共生体", "SYMBIOTE", "生物融合战士，暗涌侵蚀一切。",
 				CardClass.Symbiote, new Color(0.13f, 0.77f, 0.37f), 75, 3, 5, "侵蚀 Erosion",
-				"res://resources/textures/characters/symbiote.svg");
+				CyberCardFactory.GetClassPortraitPath(CardClass.Symbiote));
 		}
 		else
 		{
@@ -316,7 +316,7 @@ public partial class MainMenu : Control
 				var color = new Color(def.Color);
 				string mechanic = def.ClassResource != null
 					? $"{def.ClassResource.DisplayName} {def.ClassResource.DisplayNameEn}" : "";
-				string portrait = $"res://resources/textures/characters/{def.Id}.svg";
+				string portrait = CyberCardFactory.GetClassPortraitPath(def.CardClass);
 				CreateClassCard(def.Name, def.NameEn.ToUpperInvariant(), def.Description,
 					def.CardClass, color, def.MaxHp, def.BaseEnergy, def.DrawPerTurn,
 					mechanic, portrait);

@@ -8,7 +8,134 @@
 - **引擎**: Godot 4.6 + C# (.NET 8)
 - **核心系统**: 站位 + 植入体（深度咬合）
 
-## 当前阶段: Phase 3 — Roguelike 循环完整性
+## 当前阶段: Phase 4 — 差异化与打磨
+
+### 2026-05-10 Phase 4 美术资源：四职业日系二次元主立绘首批接入
+
+- 根据 `doc/世界观.md`、`doc/角色.md` 与四职业设定文档生成首批职业主视觉立绘，并按用户反馈将方向校正为日本二次元动漫 / 赛璐璐卡牌手游风格：
+  - `resources/textures/characters/vanguard.png`
+  - `resources/textures/characters/psion.png`
+  - `resources/textures/characters/netrunner.png`
+  - `resources/textures/characters/symbiote.png`
+  - 原始四职业图集保留在 `resources/textures/characters/source/phase4_class_lineup.png`
+- 接入位置：
+  - `CyberCardFactory.GetClassPortraitPath()` 改为使用 PNG 主立绘
+  - Main Menu 职业选择卡改用新立绘
+  - CombatScene 玩家立绘改用新立绘
+- 美术规范：
+  - 新增 `doc/art-direction.md`，明确后续角色与卡牌插画以 2D anime / gacha RPG illustration 为基准
+  - 排除照片写实、欧美写实概念图、3D 渲染感，防止后续资源方向漂移
+  - 固化角色性别设定：灵能者、黑客、共生体均为女性角色
+  - 固化清洁度与动作要求：角色本体低噪点、少微纹理，四职业主视觉必须使用差异化动态姿态
+  - 共生体重新设计为银白短发女性寄生宿主，避免与黑客的黑发高马尾/数据战士轮廓撞型
+  - 黑客重新精调为自信轻佻的女性入侵者，衣装改为低反光哑光黑材质与少量青色数据光
+- 动态立绘试点：
+  - 确认 Godot UI 层动态立绘采用 PNG 帧序列，而不是 GIF
+  - 建立 25fps / 1 秒标准：每个战斗动作至少 25 张透明 PNG；待机为 1 秒循环，其他动作为一次性序列
+  - 新增四职业战斗待机循环：`resources/textures/characters/animations/<class>/combat_idle/frame_00.png` 至 `frame_24.png`
+  - 新增四职业攻击 / 加甲 / 职业核心特效序列：`attack`、`gain_armor`、先锋 `overload`、灵能者 `resonance`、黑客 `protocol_stack`、共生体 `erosion`
+  - 战斗动态立绘使用透明背景，并改为朝右面向敌人的战斗姿态
+  - 四职业待机动作区分：先锋重装呼吸与反应炉脉冲、灵能者悬浮共鸣、黑客轻佻数据操控、共生体寄生体脉动蓄势
+  - `CombatScene` 支持优先加载职业 combat idle 帧序列，未提供动画的职业自动回退静态 PNG；玩家出攻击牌、加甲牌、职业核心/能力牌时会临时播放对应动作序列并回到待机
+- 卡面表现：
+  - 紧凑战斗卡面加入低透明度职业人物底图
+  - 保留现有每张卡的 `artPath` 插画层作为前景，后续可逐张替换独立 PNG/WebP
+- 动态立绘基础：
+  - 战斗内玩家立绘保留呼吸缩放
+  - 新增职业色光晕脉冲与扫描线，先形成“活着的立绘”基础效果
+- 验证：
+  - `dotnet test` = **54/54 pass**
+  - Phase 3 UI smoke = **124 checks pass**
+  - Phase 3 Flow smoke = **19 checks pass**
+  - Phase 3 Interaction smoke = **24 checks pass**
+  - Phase 3 Act smoke = **120 checks pass**
+
+---
+
+### 2026-05-10 Phase 4.1 站位系统深化：敌人位移闭环
+
+- 接入“把敌人推入后排 → 近战敌失能一回合”的最小可玩闭环：
+  - `vanguard_impact_shell`（冲击弹）新增 `reposition` 效果，将目标推入后排
+  - 战斗核心已有的近战敌后排失能逻辑由新测试覆盖，避免后续重构漂移
+- 强化 Combat UI 的敌方站位表现：
+  - `EnemyArea` 动态生成 `EnemyBackLane` / `EnemyFrontLane`
+  - 敌人面板会按 `FormationSystem` 的当前位置进入对应 lane；后续被推位时刷新会移动到新 lane
+  - UI smoke 增加 lane 渲染检查
+- 新增核心测试：
+  - `tests/RogueCardGame.Tests/Phase4FormationTests.cs`
+  - 覆盖敌人 `preferredRow` 初始化、近战不能越过前排、冲击弹推位、被推后排的前排近战敌失能且不造成伤害
+- 验证：
+  - `dotnet test` = **54/54 pass**（Godot SourceGenerator warning 仍为测试项目环境噪音）
+  - Phase 3 UI smoke = **36 checks pass**
+  - Phase 3 Flow smoke = **19 checks pass**
+  - Phase 3 Interaction smoke = **24 checks pass**
+  - Phase 3 Act smoke = **120 checks pass**
+
+---
+
+### 2026-05-10 Phase 3.8 完整 Act 自动验收
+
+- 新增 Godot headless 完整 Act smoke runner：
+  - `scripts/tools/Phase3ActSmokeRunner.cs`
+  - `scenes/testing/Phase3ActSmoke.tscn`
+- 覆盖 Act 1 连续路线：地图节点推进、自动战斗、奖励处理、事件选择、休息处理、Boss 战胜利，并验证 Boss 后进入 Act 2。
+- runner 使用固定测试补给、休息点补给刷新、Boss 前/中维修药剂保护来稳定自动玩家；核心流程仍走真实场景、真实战斗管理器、真实奖励与地图推进。
+- 验证：Godot headless Act smoke = **120 checks pass**（rooms=15, combats=9, rewards=9, events=3, rests=3）。
+
+---
+
+### 2026-05-10 Phase 3.7 分支交互验收
+
+- 新增 Godot headless 分支交互 smoke runner：
+  - `scripts/tools/Phase3InteractionSmokeRunner.cs`
+  - `scenes/testing/Phase3InteractionSmoke.tscn`
+- 覆盖 Phase 3 分支 UI 的点击行为与 run state 变化：
+  - 奖励页：点击卡牌奖励后加入牌组，跳过按钮进入返回地图状态
+  - 商店：点击卡牌商品后消耗金币并加入牌组
+  - 事件：点击可用选项后显示结果文本与继续按钮
+  - 休息：点击升级流程，确认后卡牌进入升级状态
+  - 休息：点击治疗后玩家 HP 上升
+- runner 与其他 smoke 一样会备份/恢复 `user://saves/`，并在每个分支场景卸载时清理音频播放资源，保持 headless 输出干净。
+- 验证：Godot headless interaction smoke = **24 checks pass**。
+
+---
+
+### 2026-05-10 Phase 3.7 场景流转验收
+
+- 新增 Godot headless 场景流转 smoke runner：
+  - `scripts/tools/Phase3FlowSmokeRunner.cs`
+  - `scenes/testing/Phase3FlowSmoke.tscn`
+- 覆盖真实场景路由：
+  - 启动测试 run 并进入 `MapScene`
+  - 点击地图中的可达战斗节点，验证进入 `CombatScene`
+  - 在战斗场景内自动选择可打出的卡牌、结算敌方回合，直到击败首个战斗节点
+  - 验证战斗胜利进入 `RewardScene`
+  - 点击奖励页 `SkipBtn`，验证回到 `MapScene`
+  - 校验 `CurrentSceneId`、当前地图节点、`FloorsCleared`、已访问节点状态在场景切换后保持一致
+- runner 会等待 `SceneManager` 淡入淡出结束后再推进下一步，避免 transition 中的二次切场景被忽略。
+- 验证：Godot headless flow smoke = **19 checks pass**。
+
+---
+
+### 2026-05-10 Phase 3.7 UI 场景级验收
+
+- 新增 Godot headless 场景级 smoke runner：
+  - `scripts/tools/Phase3UiSmokeRunner.cs`
+  - `scenes/testing/Phase3UiSmoke.tscn`
+- 覆盖 Phase 3 关键 UI 场景加载与动态内容渲染：
+  - 主菜单：基础按钮与职业选择网格
+  - 地图：节点/路径容器与顶部信息
+  - 战斗：敌人、开局手牌、结束回合、站位切换、牌堆信息
+  - 奖励：金币奖励、卡牌奖励、跳过按钮
+  - 商店：卡牌、药水/植入体、服务区
+  - 事件：标题与延迟生成的选择项
+  - 休息：HP、休息、升级、卡牌列表容器
+- runner 会在执行前备份 `user://saves/`，结束后恢复，避免 UI 验收覆盖本机存档。
+- 验证：
+  - `dotnet build RogueCardGame.csproj` = **0 error / 0 warning**
+  - Godot headless UI smoke = **36 checks pass**
+
+---
 
 ### 2026-05-10 Phase 3.7 小步推进
 
@@ -150,8 +277,11 @@
 - [x] SaveData / GameSettings 数据结构完整
 
 ### 3.7 待验证
-- [ ] 场景间串联端到端测试（地图 → 战斗 → 奖励 → 地图；核心层 Act 烟雾测试已补，仍需 Godot 实机/场景级验证）
-- [ ] Godot 编辑器首次运行调试
+- [x] Godot 场景级 UI smoke（主菜单 / 地图 / 战斗 / 奖励 / 商店 / 事件 / 休息，36 checks）
+- [x] Godot 场景流转 smoke（地图 → 战斗自动出牌 → 奖励 → 地图，19 checks）
+- [x] Godot 分支交互 smoke（奖励选牌 / 商店买卡 / 事件选择 / 休息升级 / 休息治疗，24 checks）
+- [x] 真实完整 Act 验收（Act 1 连续路线 → Boss → Act 2，120 checks）
+- [ ] Godot 编辑器首次运行调试（F5 实机可视化验证）
 - [ ] 实际游戏平衡性体验（数值是否需要调整）
 
 ---

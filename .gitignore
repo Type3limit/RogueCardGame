@@ -4,6 +4,7 @@
 .godot/
 *.import
 godot/
+gdot/
 # Mono/C# ignores
 .mono/
 data_*/

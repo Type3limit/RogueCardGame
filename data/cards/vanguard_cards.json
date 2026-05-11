@@ -734,11 +734,15 @@
     "cost": 2,
     "range": "ranged",
     "targetType": "singleEnemy",
-    "description": "造成 12 点伤害。后排第一张远程牌额外造成 +20% 伤害。",
+    "description": "造成 12 点伤害。将目标推入后排。后排第一张远程牌额外造成 +20% 伤害。",
     "effects": [
       {
         "type": "damage",
         "value": 12
+      },
+      {
+        "type": "reposition",
+        "value": 1
       }
     ],
     "upgrade": {
